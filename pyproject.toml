@@ -2,6 +2,14 @@
 name = "moon-game"
 version = "0.1.0"
 requires-python = ">=3.12"
+dependencies = ["pygame-ce>=2.5"]
+
+[build-system]
+requires = ["setuptools>=61"]
+build-backend = "setuptools.build_meta"
+
+[tool.setuptools.packages.find]
+where = ["src"]
 
 [tool.ruff]
 target-version = "py312"
@@ -26,6 +34,7 @@ pythonVersion = "3.12"
 typeCheckingMode = "standard"
 venvPath = "."
 venv = ".venv"
+extraPaths = ["src"]
 
 [dependency-groups]
 dev = ["ruff", "pyright"]
