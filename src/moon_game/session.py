@@ -18,12 +18,13 @@ class Session:
             events = poll_window_events()
             if any(event.kind is WindowEventKind.QUIT for event in events):
                 break
-            self._apply(self._ui.read_commands(events))
+            commands = self._ui.read_commands(events)
+            self._execute(commands)
             if self._should_tick():
                 self._simulation.tick(self._state, dt)
             self._ui.draw(self._state)
 
-    def _apply(self, commands: list[PlayerCommand]) -> None:
+    def _execute(self, commands: list[PlayerCommand]) -> None:
         if PlayerCommand.START in commands:
             self._state.start_delivery()
 
