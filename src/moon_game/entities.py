@@ -23,33 +23,52 @@ class DeliveryState(Enum):
     COMPLETED = "completed"
 
 
+@dataclass(frozen=True)
+class Map:
+    id: str
+    base: Vec2
+    image_key: str
+
+
 @dataclass
 class Rover:
     id: str
     position: Vec2
     speed: float
+    image_key: str
     status: RoverStatus = RoverStatus.IDLE
 
 
 @dataclass(frozen=True)
+class Endpoint:
+    id: str
+    name: str
+    position: Vec2
+
+
+@dataclass(frozen=True)
 class Route:
+    id: str
+    endpoint: Endpoint
     waypoints: tuple[Vec2, ...]
     length: float
 
     @staticmethod
-    def from_waypoints(waypoints: tuple[Vec2, ...]) -> Route:
+    def from_waypoints(
+        waypoints: tuple[Vec2, ...],
+        *,
+        id: str,
+        endpoint: Endpoint,
+    ) -> Route:
+        path = (*waypoints, endpoint.position)
         length = 0.0
-        for start, end in pairwise(waypoints):
+        for start, end in pairwise(path):
             length += start.distance_to(end)
-        return Route(waypoints=waypoints, length=length)
+        return Route(id=id, endpoint=endpoint, waypoints=path, length=length)
 
     @property
     def start(self) -> Vec2:
         return self.waypoints[0]
-
-    @property
-    def destination(self) -> Vec2:
-        return self.waypoints[-1]
 
     def point_at(self, progress: float, *, reverse: bool = False) -> Vec2:
         t = 1.0 - progress if reverse else progress

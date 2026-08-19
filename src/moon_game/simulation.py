@@ -26,7 +26,7 @@ class Simulation:
             delivery.direction = DeliveryDirection.RETURNING
             delivery.progress = 0.0
             delivery.rover.status = RoverStatus.RETURNING
-            delivery.rover.position = delivery.route.destination
+            delivery.rover.position = delivery.route.endpoint.position
             return
         self._finish(state, delivery)
 
@@ -36,6 +36,7 @@ class Simulation:
         delivery.rover.status = RoverStatus.IDLE
         delivery.rover.position = delivery.route.start
         state.phase = GamePhase.PLANNING
+        state.paused = False
 
     def _update_position(self, delivery: Delivery) -> None:
         reverse = delivery.direction is DeliveryDirection.RETURNING
