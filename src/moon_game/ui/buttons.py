@@ -8,6 +8,7 @@ from moon_game.assignment import can_assign, routes_for_order
 from moon_game.commands import BuyRover, EndDay, NextDay, Pause, StartDay
 from moon_game.entities import Order, Route, Rover, ShopOffer
 from moon_game.game_state import GamePhase, GameState
+from moon_game.hazard import risk_label
 from moon_game.purchase import can_buy
 from moon_game.ui.commands import (
     Confirm,
@@ -488,4 +489,4 @@ def _order_label(order: Order) -> str:
 
 
 def _route_label(route: Route) -> str:
-    return f"{route.name}  {route.length:.0f}"
+    return f"{route.name}  {route.length:.0f}  {risk_label(route)}"

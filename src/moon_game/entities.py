@@ -83,6 +83,7 @@ class Route:
     endpoint: Endpoint
     waypoints: tuple[Vec2, ...]
     length: float
+    risk: float
 
     @staticmethod
     def from_waypoints(
@@ -91,6 +92,7 @@ class Route:
         id: str,
         name: str,
         endpoint: Endpoint,
+        risk: float,
     ) -> Route:
         path = (*waypoints, endpoint.position)
         length = 0.0
@@ -102,6 +104,7 @@ class Route:
             endpoint=endpoint,
             waypoints=path,
             length=length,
+            risk=risk,
         )
 
     @property
@@ -132,6 +135,8 @@ class Delivery:
     progress: float = 0.0
     direction: DeliveryDirection = DeliveryDirection.TO_DESTINATION
     state: DeliveryState = DeliveryState.ACTIVE
+    hazard_resolved: bool = False
+    stall_remaining: float = 0.0
 
 
 @dataclass(frozen=True)

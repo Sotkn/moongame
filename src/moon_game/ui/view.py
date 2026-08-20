@@ -27,6 +27,7 @@ from moon_game.entities import (
     ShopOffer,
 )
 from moon_game.game_state import GamePhase, GameState
+from moon_game.hazard import HIGH_RISK
 from moon_game.purchase import can_buy
 from moon_game.ui.buttons import (
     Button,
@@ -59,6 +60,8 @@ from moon_game.window_events import WindowEvent, WindowEventKind
 WINDOW_SIZE = (960, 540)
 ROUTE_COLOR = (92, 98, 112)
 ROUTE_HIGHLIGHT = (168, 196, 224)
+ROUTE_HIGH_RISK = (196, 108, 72)
+ROUTE_HIGH_RISK_HIGHLIGHT = (232, 168, 120)
 BUTTON_IDLE = (70, 92, 122)
 BUTTON_SELECTED = (110, 150, 190)
 BUTTON_DISABLED = (48, 54, 64)
@@ -289,7 +292,11 @@ class Ui:
 
     def _draw_route(self, route: Route, *, highlighted: bool) -> None:
         points = [point.to_int_tuple() for point in route.waypoints]
-        color = ROUTE_HIGHLIGHT if highlighted else ROUTE_COLOR
+        high_risk = route.risk >= HIGH_RISK
+        if highlighted:
+            color = ROUTE_HIGH_RISK_HIGHLIGHT if high_risk else ROUTE_HIGHLIGHT
+        else:
+            color = ROUTE_HIGH_RISK if high_risk else ROUTE_COLOR
         width = 5 if highlighted else 3
         pygame.draw.lines(self._screen, color, False, points, width)
 
@@ -545,15 +552,33 @@ class Ui:
             f"Day  {state.day_number}    Time  {remaining:.0f}s    Money  {state.money}"
         )
         line = self._font.render(text, True, LABEL_COLOR)
+        notice = (
+            self._font.render(state.hazard_notice, True, REASON_COLOR)
+            if state.hazard_notice
+            else None
+        )
+        width = line.get_width()
+        height = line.get_height()
+        if notice is not None:
+            width = max(width, notice.get_width())
+            height += 4 + notice.get_height()
         plate = pygame.Rect(
             16,
             8,
-            line.get_width() + 2 * HUD_PLATE_PAD_X,
-            line.get_height() + 2 * HUD_PLATE_PAD_Y,
+            width + 2 * HUD_PLATE_PAD_X,
+            height + 2 * HUD_PLATE_PAD_Y,
         )
         pygame.draw.rect(self._screen, PANEL_BG, plate, border_radius=8)
         pygame.draw.rect(self._screen, PANEL_BORDER, plate, width=1, border_radius=8)
         self._screen.blit(line, (plate.x + HUD_PLATE_PAD_X, plate.y + HUD_PLATE_PAD_Y))
+        if notice is not None:
+            self._screen.blit(
+                notice,
+                (
+                    plate.x + HUD_PLATE_PAD_X,
+                    plate.y + HUD_PLATE_PAD_Y + line.get_height() + 4,
+                ),
+            )
         if state.phase is GamePhase.DAY_END or self._open_panel is not OpenPanel.NONE:
             return
         y = plate.bottom + 8

@@ -74,6 +74,7 @@ class EndDay:
         state.day_elapsed = state.day_length
         state.phase = GamePhase.DAY_END
         state.pending_event = None
+        state.hazard_notice = None
 
 
 type PlayerCommand = (

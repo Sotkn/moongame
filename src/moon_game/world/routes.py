@@ -14,6 +14,7 @@ def build_routes(play_map: Map) -> list[Route]:
             id="ridge-short",
             name="Short",
             endpoint=RIDGE,
+            risk=0.7,
         ),
         Route.from_waypoints(
             (
@@ -26,6 +27,7 @@ def build_routes(play_map: Map) -> list[Route]:
             id="ridge-long",
             name="Long",
             endpoint=RIDGE,
+            risk=0.1,
         ),
         Route.from_waypoints(
             (
@@ -36,6 +38,7 @@ def build_routes(play_map: Map) -> list[Route]:
             id="crater",
             name="Direct",
             endpoint=CRATER,
+            risk=0.1,
         ),
         Route.from_waypoints(
             (
@@ -46,5 +49,6 @@ def build_routes(play_map: Map) -> list[Route]:
             id="outpost",
             name="Direct",
             endpoint=OUTPOST,
+            risk=0.1,
         ),
     ]

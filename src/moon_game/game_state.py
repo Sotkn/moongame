@@ -47,6 +47,7 @@ class GameState:
     money: int = 0
     phase: GamePhase = GamePhase.DAY_START
     pending_event: ChooseDelivery | None = None
+    hazard_notice: str | None = None
     paused: bool = True
     day_number: int = 1
     day_elapsed: float = 0.0
@@ -103,6 +104,7 @@ class GameState:
         self.phase = GamePhase.DAY_START
         self.paused = True
         self.pending_event = None
+        self.hazard_notice = None
         self._rest_rovers()
 
     def _rest_rovers(self) -> None:
