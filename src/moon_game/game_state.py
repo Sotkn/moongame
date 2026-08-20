@@ -9,6 +9,7 @@ from moon_game.assignment import can_assign, route_for_order
 from moon_game.entities import (
     ChooseDelivery,
     Delivery,
+    DeliveryState,
     Endpoint,
     Map,
     Order,
@@ -91,6 +92,13 @@ class GameState:
                 battery_max=offer.battery_max,
             )
         )
+
+    def abort_active_trips(self) -> None:
+        for delivery in self.deliveries:
+            if delivery.state is not DeliveryState.ACTIVE:
+                continue
+            delivery.rover.status = RoverStatus.IDLE
+            delivery.rover.position = self.map.base
 
     def start_next_day(self, orders: list[Order]) -> None:
         self.day_number += 1

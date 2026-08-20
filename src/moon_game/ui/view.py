@@ -8,6 +8,7 @@ from moon_game.asset_catalog import asset_path
 from moon_game.commands import (
     BuyRover,
     DismissChoice,
+    EndDay,
     NextDay,
     Pause,
     PlayerCommand,
@@ -28,17 +29,28 @@ from moon_game.game_state import GamePhase, GameState
 from moon_game.purchase import can_buy
 from moon_game.ui.buttons import (
     Button,
+    assignment_title,
     build_buttons,
     button_enabled,
     button_selected,
     overlay_reason,
     overlay_rect,
-    overlay_title,
     rover_card_rect,
     shop_buy_rect,
-    shop_row_rect,
+    shop_job_row_rect,
+    shop_jobs_heading_y,
+    shop_offer_row_rect,
+    shop_park_heading_y,
+    shop_park_row_rect,
 )
-from moon_game.ui.commands import Confirm, SelectOrder, SelectRover, ToggleOrders
+from moon_game.ui.commands import (
+    Confirm,
+    OpenPanel,
+    SelectOrder,
+    SelectRover,
+    ToggleAssign,
+    ToggleShop,
+)
 from moon_game.window_events import WindowEvent, WindowEventKind
 
 WINDOW_SIZE = (960, 540)
@@ -55,6 +67,8 @@ OVERLAY_DIM = (8, 10, 16, 150)
 PANEL_BG = (28, 34, 44)
 PANEL_BORDER = (70, 92, 122)
 ROVER_CARD_BG = (36, 42, 52)
+HUD_PLATE_PAD_X = 12
+HUD_PLATE_PAD_Y = 8
 SPRITE_MAX_SIZE = {
     "rover": 48,
     "base": 100,
@@ -74,7 +88,7 @@ class Ui:
         self._images: dict[str, pygame.Surface] = {}
         self._selected_order_id: str | None = None
         self._selected_rover_id: str | None = None
-        self._orders_open = True
+        self._open_panel = OpenPanel.ASSIGNMENT
         self._last_phase: GamePhase | None = None
         self._last_pending: ChooseDelivery | None = None
         self._dim = pygame.Surface(WINDOW_SIZE, pygame.SRCALPHA)
@@ -89,7 +103,7 @@ class Ui:
         buttons = build_buttons(
             state,
             WINDOW_SIZE,
-            orders_open=self._orders_open,
+            open_panel=self._open_panel,
         )
         commands: list[PlayerCommand] = []
         for event in events:
@@ -103,8 +117,10 @@ class Ui:
             self._draw_rover(rover)
         if state.phase is GamePhase.DAY_END:
             self._draw_day_end(state)
-        elif self._orders_open:
-            self._draw_overlay(state)
+        elif self._open_panel is OpenPanel.ASSIGNMENT:
+            self._draw_assignment(state)
+        elif self._open_panel is OpenPanel.SHOP:
+            self._draw_shop(state)
         self._draw_hud(state)
         self._draw_buttons(state)
         pygame.display.flip()
@@ -119,13 +135,13 @@ class Ui:
             self._selected_order_id = None
         pending = state.pending_event
         if isinstance(pending, ChooseDelivery) and pending != self._last_pending:
-            self._orders_open = True
+            self._open_panel = OpenPanel.ASSIGNMENT
             self._selected_rover_id = pending.rover.id
         if self._last_phase is GamePhase.DAY_END and state.phase is GamePhase.DAY_START:
-            self._orders_open = True
+            self._open_panel = OpenPanel.ASSIGNMENT
             self._selected_order_id = None
         if state.phase is GamePhase.DAY_END:
-            self._orders_open = False
+            self._open_panel = OpenPanel.NONE
         self._last_pending = state.pending_event
         self._last_phase = state.phase
 
@@ -183,12 +199,14 @@ class Ui:
             return []
         if isinstance(command, Confirm):
             return self._send_command(state)
-        if isinstance(command, ToggleOrders):
-            return self._toggle_orders()
+        if isinstance(command, ToggleAssign):
+            return self._toggle_assign()
+        if isinstance(command, ToggleShop):
+            return self._toggle_shop()
         if isinstance(command, BuyRover):
             self._selected_rover_id = command.offer.id
             return [command]
-        if isinstance(command, (Pause, StartDay, NextDay)):
+        if isinstance(command, (Pause, StartDay, NextDay, EndDay)):
             return [command]
         return []
 
@@ -199,11 +217,19 @@ class Ui:
             return []
         return [StartDelivery(rover, order)]
 
-    def _toggle_orders(self) -> list[PlayerCommand]:
-        self._orders_open = not self._orders_open
-        if self._orders_open:
+    def _toggle_assign(self) -> list[PlayerCommand]:
+        if self._open_panel is OpenPanel.ASSIGNMENT:
+            self._open_panel = OpenPanel.NONE
+            return [DismissChoice()]
+        self._open_panel = OpenPanel.ASSIGNMENT
+        return []
+
+    def _toggle_shop(self) -> list[PlayerCommand]:
+        if self._open_panel is OpenPanel.SHOP:
+            self._open_panel = OpenPanel.NONE
             return []
-        return [DismissChoice()]
+        self._open_panel = OpenPanel.SHOP
+        return []
 
     def _draw_map(self, state: GameState) -> None:
         self._screen.blit(self._image(state.map.image_key), (0, 0))
@@ -248,24 +274,13 @@ class Ui:
         offset_y = -rect.height // 2 - 14 if above else rect.height // 2 + 14
         self._draw_label(label, origin, (0, offset_y))
 
-    def _draw_overlay(self, state: GameState) -> None:
-        self._screen.blit(self._dim, (0, 0))
-        panel = overlay_rect(WINDOW_SIZE)
-        pygame.draw.rect(self._screen, PANEL_BG, panel, border_radius=10)
-        pygame.draw.rect(self._screen, PANEL_BORDER, panel, width=2, border_radius=10)
-        title = self._title_font.render(overlay_title(state), True, BUTTON_TEXT)
+    def _draw_assignment(self, state: GameState) -> None:
+        panel = self._draw_panel_frame()
+        title = self._title_font.render(assignment_title(state), True, BUTTON_TEXT)
         self._screen.blit(title, (panel.x + 24, panel.y + 20))
-        self._draw_shop_rows(state, panel)
         rover_count = len(state.rovers)
-        shop_count = len(state.shop_offers)
         for index, rover in enumerate(state.rovers):
-            card = rover_card_rect(
-                panel,
-                len(state.orders),
-                shop_count,
-                index,
-                rover_count,
-            )
+            card = rover_card_rect(panel, len(state.orders), index, rover_count)
             self._draw_rover_card(
                 rover,
                 card,
@@ -281,21 +296,29 @@ class Ui:
             reason_x = panel.x + 24
             reason_y = panel.y + 64
             if rover_count:
-                card = rover_card_rect(
-                    panel,
-                    len(state.orders),
-                    shop_count,
-                    0,
-                    rover_count,
-                )
+                card = rover_card_rect(panel, len(state.orders), 0, rover_count)
                 reason_x = card.x
                 reason_y = card.bottom + 12
             self._screen.blit(text, (reason_x, reason_y))
 
-    def _draw_shop_rows(self, state: GameState, panel: pygame.Rect) -> None:
-        order_count = len(state.orders)
+    def _draw_shop(self, state: GameState) -> None:
+        panel = self._draw_panel_frame()
+        title = self._title_font.render("Shop", True, BUTTON_TEXT)
+        self._screen.blit(title, (panel.x + 24, panel.y + 20))
+        self._draw_shop_offers(state, panel)
+        self._draw_shop_park(state, panel)
+        self._draw_shop_jobs(state, panel)
+
+    def _draw_panel_frame(self) -> pygame.Rect:
+        self._screen.blit(self._dim, (0, 0))
+        panel = overlay_rect(WINDOW_SIZE)
+        pygame.draw.rect(self._screen, PANEL_BG, panel, border_radius=10)
+        pygame.draw.rect(self._screen, PANEL_BORDER, panel, width=2, border_radius=10)
+        return panel
+
+    def _draw_shop_offers(self, state: GameState, panel: pygame.Rect) -> None:
         for index, offer in enumerate(state.shop_offers):
-            row = shop_row_rect(panel, order_count, index)
+            row = shop_offer_row_rect(panel, index)
             pygame.draw.rect(self._screen, ROVER_CARD_BG, row, border_radius=6)
             stats = self._font.render(_shop_label(offer), True, BUTTON_TEXT)
             self._screen.blit(
@@ -306,15 +329,55 @@ class Ui:
             if result.allowed:
                 continue
             reason = self._font.render(result.reason, True, REASON_COLOR)
-            buy = shop_buy_rect(panel, order_count, index)
+            buy = shop_buy_rect(panel, index)
             dest = reason.get_rect(midright=(buy.x - 12, row.centery))
             self._screen.blit(reason, dest)
 
+    def _draw_shop_park(self, state: GameState, panel: pygame.Rect) -> None:
+        offer_count = len(state.shop_offers)
+        heading = self._font.render("Park", True, BUTTON_TEXT)
+        self._screen.blit(
+            heading,
+            (panel.x + 24, shop_park_heading_y(panel, offer_count)),
+        )
+        if not state.rovers:
+            empty = self._font.render("None", True, LABEL_COLOR)
+            row = shop_park_row_rect(panel, offer_count, 0)
+            self._screen.blit(empty, empty.get_rect(midleft=(row.x + 12, row.centery)))
+            return
+        for index, rover in enumerate(state.rovers):
+            row = shop_park_row_rect(panel, offer_count, index)
+            pygame.draw.rect(self._screen, ROVER_CARD_BG, row, border_radius=6)
+            line = self._font.render(_shop_park_label(rover), True, BUTTON_TEXT)
+            self._screen.blit(
+                line,
+                line.get_rect(midleft=(row.x + 12, row.centery)),
+            )
+
+    def _draw_shop_jobs(self, state: GameState, panel: pygame.Rect) -> None:
+        offer_count = len(state.shop_offers)
+        rover_count = len(state.rovers)
+        heading = self._font.render("Jobs", True, BUTTON_TEXT)
+        self._screen.blit(
+            heading,
+            (panel.x + 24, shop_jobs_heading_y(panel, offer_count, rover_count)),
+        )
+        if not state.orders:
+            empty = self._font.render("None", True, LABEL_COLOR)
+            row = shop_job_row_rect(panel, offer_count, rover_count, 0)
+            self._screen.blit(empty, empty.get_rect(midleft=(row.x + 12, row.centery)))
+            return
+        for index, order in enumerate(state.orders):
+            row = shop_job_row_rect(panel, offer_count, rover_count, index)
+            pygame.draw.rect(self._screen, ROVER_CARD_BG, row, border_radius=6)
+            line = self._font.render(_shop_job_label(order), True, LABEL_COLOR)
+            self._screen.blit(
+                line,
+                line.get_rect(midleft=(row.x + 12, row.centery)),
+            )
+
     def _draw_day_end(self, state: GameState) -> None:
-        self._screen.blit(self._dim, (0, 0))
-        panel = overlay_rect(WINDOW_SIZE)
-        pygame.draw.rect(self._screen, PANEL_BG, panel, border_radius=10)
-        pygame.draw.rect(self._screen, PANEL_BORDER, panel, width=2, border_radius=10)
+        panel = self._draw_panel_frame()
         title = self._title_font.render("Day end", True, BUTTON_TEXT)
         self._screen.blit(title, (panel.x + 24, panel.y + 20))
         money = self._font.render(f"Money  {state.money}", True, LABEL_COLOR)
@@ -386,7 +449,7 @@ class Ui:
         for button in build_buttons(
             state,
             WINDOW_SIZE,
-            orders_open=self._orders_open,
+            open_panel=self._open_panel,
         ):
             if isinstance(button.command, SelectRover):
                 continue
@@ -400,6 +463,7 @@ class Ui:
                 button,
                 self._selected_order_id,
                 self._selected_rover_id,
+                self._open_panel,
             )
             if selected:
                 color = BUTTON_SELECTED
@@ -421,10 +485,18 @@ class Ui:
             f"Day  {state.day_number}    Time  {remaining:.0f}s    Money  {state.money}"
         )
         line = self._font.render(text, True, LABEL_COLOR)
-        self._screen.blit(line, (24, 16))
-        if state.phase is GamePhase.DAY_END or self._orders_open:
+        plate = pygame.Rect(
+            16,
+            8,
+            line.get_width() + 2 * HUD_PLATE_PAD_X,
+            line.get_height() + 2 * HUD_PLATE_PAD_Y,
+        )
+        pygame.draw.rect(self._screen, PANEL_BG, plate, border_radius=8)
+        pygame.draw.rect(self._screen, PANEL_BORDER, plate, width=1, border_radius=8)
+        self._screen.blit(line, (plate.x + HUD_PLATE_PAD_X, plate.y + HUD_PLATE_PAD_Y))
+        if state.phase is GamePhase.DAY_END or self._open_panel is not OpenPanel.NONE:
             return
-        y = 42
+        y = plate.bottom + 8
         for rover in state.rovers:
             y = self._draw_rover_stats(rover, 24, y)
 
@@ -475,6 +547,16 @@ def _shop_label(offer: ShopOffer) -> str:
     return (
         f"{offer.id}  cap {offer.capacity}  bat {offer.battery_max:.0f}  ${offer.price}"
     )
+
+
+def _shop_park_label(rover: Rover) -> str:
+    battery = f"{rover.battery:.0f}/{rover.battery_max:.0f}"
+    status = _rover_status_label(rover)
+    return f"{rover.id}  cap {rover.capacity}  bat {battery}  {status}"
+
+
+def _shop_job_label(order: Order) -> str:
+    return f"{order.endpoint.name}  ${order.reward}"
 
 
 def _summary_order_label(order: Order) -> str:

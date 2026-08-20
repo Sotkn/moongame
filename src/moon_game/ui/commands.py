@@ -1,4 +1,11 @@
 from dataclasses import dataclass
+from enum import Enum
+
+
+class OpenPanel(Enum):
+    NONE = "none"
+    ASSIGNMENT = "assignment"
+    SHOP = "shop"
 
 
 @dataclass(frozen=True)
@@ -17,5 +24,10 @@ class Confirm:
 
 
 @dataclass(frozen=True)
-class ToggleOrders:
+class ToggleAssign:
+    pass
+
+
+@dataclass(frozen=True)
+class ToggleShop:
     pass

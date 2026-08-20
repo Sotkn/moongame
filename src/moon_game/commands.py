@@ -64,6 +64,17 @@ class BuyRover:
         state.buy_rover(self.offer)
 
 
+@dataclass(frozen=True)
+class EndDay:
+    def apply(self, state: GameState) -> None:
+        if state.phase not in (GamePhase.DAY_START, GamePhase.RUNNING):
+            return
+        state.abort_active_trips()
+        state.day_elapsed = state.day_length
+        state.phase = GamePhase.DAY_END
+        state.pending_event = None
+
+
 type PlayerCommand = (
-    StartDelivery | StartDay | DismissChoice | Pause | NextDay | BuyRover
+    StartDelivery | StartDay | DismissChoice | Pause | NextDay | BuyRover | EndDay
 )

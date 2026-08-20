@@ -35,7 +35,7 @@ class Simulation:
             return []
         state.day_elapsed += dt
         if state.day_elapsed >= state.day_length:
-            self._abort_active_trips(state)
+            state.abort_active_trips()
             return [DayEnded()]
         events: list[SimEvent] = []
         for delivery in state.deliveries:
@@ -43,13 +43,6 @@ class Simulation:
                 if self._advance(state, delivery, dt):
                     events.append(DeliveryCompleted(rover=delivery.rover))
         return events
-
-    def _abort_active_trips(self, state: GameState) -> None:
-        for delivery in state.deliveries:
-            if delivery.state is not DeliveryState.ACTIVE:
-                continue
-            delivery.rover.status = RoverStatus.IDLE
-            delivery.rover.position = state.map.base
 
     def _advance(self, state: GameState, delivery: Delivery, dt: float) -> bool:
         if delivery.route.length == 0.0:

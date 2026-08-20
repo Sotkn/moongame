@@ -5,11 +5,18 @@ from dataclasses import dataclass
 import pygame
 
 from moon_game.assignment import can_assign
-from moon_game.commands import BuyRover, NextDay, Pause, StartDay
+from moon_game.commands import BuyRover, EndDay, NextDay, Pause, StartDay
 from moon_game.entities import Order, Rover, ShopOffer
 from moon_game.game_state import GamePhase, GameState
 from moon_game.purchase import can_buy
-from moon_game.ui.commands import Confirm, SelectOrder, SelectRover, ToggleOrders
+from moon_game.ui.commands import (
+    Confirm,
+    OpenPanel,
+    SelectOrder,
+    SelectRover,
+    ToggleAssign,
+    ToggleShop,
+)
 
 OVERLAY_SIZE = (800, 480)
 OVERLAY_PAD = 24
@@ -24,6 +31,9 @@ BUTTON_GAP = 8
 HUD_BUTTON_SIZE = (112, 36)
 HUD_MARGIN = 16
 HUD_BUTTON_Y = 8
+SHOP_HEADING_HEIGHT = 22
+SHOP_COMPACT_ROW = 28
+SHOP_SECTION_GAP = 12
 
 type ButtonCommand = (
     SelectOrder
@@ -32,8 +42,10 @@ type ButtonCommand = (
     | Pause
     | StartDay
     | NextDay
-    | ToggleOrders
+    | ToggleAssign
+    | ToggleShop
     | BuyRover
+    | EndDay
 )
 
 
@@ -49,13 +61,15 @@ def build_buttons(
     state: GameState,
     window_size: tuple[int, int],
     *,
-    orders_open: bool,
+    open_panel: OpenPanel,
 ) -> list[Button]:
     if state.phase is GamePhase.DAY_END:
         return [_next_day_button(window_size)]
     buttons = _hud_buttons(state, window_size)
-    if orders_open:
-        buttons.extend(_overlay_buttons(state, window_size))
+    if open_panel is OpenPanel.ASSIGNMENT:
+        buttons.extend(_assignment_buttons(state, window_size))
+    elif open_panel is OpenPanel.SHOP:
+        buttons.extend(_shop_buttons(state, window_size))
     return buttons
 
 
@@ -74,9 +88,11 @@ def button_enabled(
         return state.phase is GamePhase.DAY_END
     if isinstance(command, BuyRover):
         return _buy_enabled(state, command.offer)
+    if isinstance(command, EndDay):
+        return state.phase in (GamePhase.DAY_START, GamePhase.RUNNING)
     return isinstance(
         command,
-        (SelectOrder, SelectRover, Pause, ToggleOrders),
+        (SelectOrder, SelectRover, Pause, ToggleAssign, ToggleShop),
     )
 
 
@@ -84,15 +100,20 @@ def button_selected(
     button: Button,
     selected_order_id: str | None,
     selected_rover_id: str | None,
+    open_panel: OpenPanel,
 ) -> bool:
     if isinstance(button.command, SelectOrder):
         return button.command.order_id == selected_order_id
     if isinstance(button.command, SelectRover):
         return button.command.rover_id == selected_rover_id
+    if isinstance(button.command, ToggleAssign):
+        return open_panel is OpenPanel.ASSIGNMENT
+    if isinstance(button.command, ToggleShop):
+        return open_panel is OpenPanel.SHOP
     return False
 
 
-def overlay_title(state: GameState) -> str:
+def assignment_title(state: GameState) -> str:
     if state.phase is GamePhase.DAY_START:
         return "Day start"
     return "Orders"
@@ -123,20 +144,12 @@ def overlay_rect(window_size: tuple[int, int]) -> pygame.Rect:
     )
 
 
-def shop_row_rect(
-    overlay: pygame.Rect,
-    order_count: int,
-    index: int,
-) -> pygame.Rect:
-    return _order_row_rect(overlay, order_count + index)
+def shop_offer_row_rect(overlay: pygame.Rect, index: int) -> pygame.Rect:
+    return _content_row_rect(overlay, index, ROW_HEIGHT, ROW_GAP)
 
 
-def shop_buy_rect(
-    overlay: pygame.Rect,
-    order_count: int,
-    index: int,
-) -> pygame.Rect:
-    row = shop_row_rect(overlay, order_count, index)
+def shop_buy_rect(overlay: pygame.Rect, index: int) -> pygame.Rect:
+    row = shop_offer_row_rect(overlay, index)
     width, height = BUTTON_SIZE
     return pygame.Rect(
         row.right - width,
@@ -146,14 +159,58 @@ def shop_buy_rect(
     )
 
 
+def shop_park_heading_y(overlay: pygame.Rect, offer_count: int) -> int:
+    return _rows_bottom(overlay, offer_count, ROW_HEIGHT, ROW_GAP) + SHOP_SECTION_GAP
+
+
+def shop_park_row_rect(
+    overlay: pygame.Rect,
+    offer_count: int,
+    index: int,
+) -> pygame.Rect:
+    y = shop_park_heading_y(overlay, offer_count) + SHOP_HEADING_HEIGHT
+    y += index * (SHOP_COMPACT_ROW + ROW_GAP)
+    return pygame.Rect(
+        overlay.x + OVERLAY_PAD,
+        y,
+        overlay.width - 2 * OVERLAY_PAD,
+        SHOP_COMPACT_ROW,
+    )
+
+
+def shop_jobs_heading_y(
+    overlay: pygame.Rect,
+    offer_count: int,
+    rover_count: int,
+) -> int:
+    last_park = max(0, rover_count - 1)
+    park_bottom = shop_park_row_rect(overlay, offer_count, last_park).bottom
+    return park_bottom + SHOP_SECTION_GAP
+
+
+def shop_job_row_rect(
+    overlay: pygame.Rect,
+    offer_count: int,
+    rover_count: int,
+    index: int,
+) -> pygame.Rect:
+    y = shop_jobs_heading_y(overlay, offer_count, rover_count) + SHOP_HEADING_HEIGHT
+    y += index * (SHOP_COMPACT_ROW + ROW_GAP)
+    return pygame.Rect(
+        overlay.x + OVERLAY_PAD,
+        y,
+        overlay.width - 2 * OVERLAY_PAD,
+        SHOP_COMPACT_ROW,
+    )
+
+
 def rover_card_rect(
     overlay: pygame.Rect,
     order_count: int,
-    shop_count: int,
     index: int,
     rover_count: int,
 ) -> pygame.Rect:
-    y = _rows_bottom(overlay, order_count + shop_count) + ROVER_CARD_GAP
+    y = _rows_bottom(overlay, order_count, ROW_HEIGHT, ROW_GAP) + ROVER_CARD_GAP
     inner_width = overlay.width - 2 * OVERLAY_PAD
     count = max(1, rover_count)
     gap = ROVER_CARD_INNER_GAP if count > 1 else 0
@@ -166,26 +223,54 @@ def _hud_buttons(
     state: GameState,
     window_size: tuple[int, int],
 ) -> list[Button]:
-    running = state.phase is GamePhase.RUNNING
-    buttons = [_orders_toggle_button(window_size, shift_for_pause=running)]
-    if running:
-        buttons.append(_pause_button(state, window_size))
+    width, height = HUD_BUTTON_SIZE
+    x = window_size[0] - HUD_MARGIN
+    y = HUD_BUTTON_Y
+    buttons: list[Button] = []
+
+    def add(button_id: str, label: str, command: ButtonCommand) -> None:
+        nonlocal x
+        x -= width
+        buttons.append(
+            Button(
+                id=button_id,
+                rect=pygame.Rect(x, y, width, height),
+                label=label,
+                command=command,
+            )
+        )
+        x -= BUTTON_GAP
+
+    add("end-day", "End day", EndDay())
+    if state.phase is GamePhase.RUNNING:
+        add("pause", "Resume" if state.paused else "Pause", Pause())
+    add("shop", "Shop", ToggleShop())
+    add("assign", "Assign", ToggleAssign())
     return buttons
 
 
-def _overlay_buttons(
+def _assignment_buttons(
     state: GameState,
     window_size: tuple[int, int],
 ) -> list[Button]:
     overlay = overlay_rect(window_size)
     buttons = _order_rows(state, overlay)
-    buttons.extend(_shop_rows(state, overlay))
     buttons.extend(_rover_cards(state, overlay))
     close_index = 2 if state.phase is GamePhase.DAY_START else 1
-    buttons.append(_close_button(overlay, close_index))
+    buttons.append(_close_button(overlay, close_index, ToggleAssign()))
     if state.phase is GamePhase.DAY_START:
         buttons.append(_start_day_button(overlay))
     buttons.append(_send_button(overlay))
+    return buttons
+
+
+def _shop_buttons(
+    state: GameState,
+    window_size: tuple[int, int],
+) -> list[Button]:
+    overlay = overlay_rect(window_size)
+    buttons = _shop_buy_rows(state, overlay)
+    buttons.append(_close_button(overlay, 0, ToggleShop()))
     return buttons
 
 
@@ -195,7 +280,7 @@ def _order_rows(state: GameState, overlay: pygame.Rect) -> list[Button]:
         buttons.append(
             Button(
                 id=f"order-{order.id}",
-                rect=_order_row_rect(overlay, index),
+                rect=_content_row_rect(overlay, index, ROW_HEIGHT, ROW_GAP),
                 label=_order_label(order),
                 command=SelectOrder(order.id),
             )
@@ -203,14 +288,13 @@ def _order_rows(state: GameState, overlay: pygame.Rect) -> list[Button]:
     return buttons
 
 
-def _shop_rows(state: GameState, overlay: pygame.Rect) -> list[Button]:
+def _shop_buy_rows(state: GameState, overlay: pygame.Rect) -> list[Button]:
     buttons: list[Button] = []
-    order_count = len(state.orders)
     for index, offer in enumerate(state.shop_offers):
         buttons.append(
             Button(
                 id=f"buy-{offer.id}",
-                rect=shop_buy_rect(overlay, order_count, index),
+                rect=shop_buy_rect(overlay, index),
                 label="Buy",
                 command=BuyRover(offer),
             )
@@ -221,7 +305,6 @@ def _shop_rows(state: GameState, overlay: pygame.Rect) -> list[Button]:
 def _rover_cards(state: GameState, overlay: pygame.Rect) -> list[Button]:
     buttons: list[Button] = []
     rover_count = len(state.rovers)
-    shop_count = len(state.shop_offers)
     for index, rover in enumerate(state.rovers):
         buttons.append(
             Button(
@@ -229,7 +312,6 @@ def _rover_cards(state: GameState, overlay: pygame.Rect) -> list[Button]:
                 rect=rover_card_rect(
                     overlay,
                     len(state.orders),
-                    shop_count,
                     index,
                     rover_count,
                 ),
@@ -258,12 +340,16 @@ def _start_day_button(overlay: pygame.Rect) -> Button:
     )
 
 
-def _close_button(overlay: pygame.Rect, index_from_right: int) -> Button:
+def _close_button(
+    overlay: pygame.Rect,
+    index_from_right: int,
+    command: ToggleAssign | ToggleShop,
+) -> Button:
     return Button(
         id="close",
         rect=_overlay_action_rect(overlay, index_from_right),
         label="Close",
-        command=ToggleOrders(),
+        command=command,
     )
 
 
@@ -274,38 +360,6 @@ def _next_day_button(window_size: tuple[int, int]) -> Button:
         rect=_overlay_action_rect(overlay, 0),
         label="Next day",
         command=NextDay(),
-    )
-
-
-def _orders_toggle_button(
-    window_size: tuple[int, int],
-    *,
-    shift_for_pause: bool,
-) -> Button:
-    width, height = HUD_BUTTON_SIZE
-    x = window_size[0] - HUD_MARGIN - width
-    if shift_for_pause:
-        x -= BUTTON_GAP + width
-    return Button(
-        id="orders",
-        rect=pygame.Rect(x, HUD_BUTTON_Y, width, height),
-        label="Orders",
-        command=ToggleOrders(),
-    )
-
-
-def _pause_button(state: GameState, window_size: tuple[int, int]) -> Button:
-    width, height = HUD_BUTTON_SIZE
-    return Button(
-        id="pause",
-        rect=pygame.Rect(
-            window_size[0] - HUD_MARGIN - width,
-            HUD_BUTTON_Y,
-            width,
-            height,
-        ),
-        label="Resume" if state.paused else "Pause",
-        command=Pause(),
     )
 
 
@@ -339,20 +393,30 @@ def _overlay_action_rect(overlay: pygame.Rect, index_from_right: int) -> pygame.
     )
 
 
-def _order_row_rect(overlay: pygame.Rect, index: int) -> pygame.Rect:
-    y = overlay.y + OVERLAY_PAD + TITLE_HEIGHT + index * (ROW_HEIGHT + ROW_GAP)
+def _content_row_rect(
+    overlay: pygame.Rect,
+    index: int,
+    height: int,
+    gap: int,
+) -> pygame.Rect:
+    y = overlay.y + OVERLAY_PAD + TITLE_HEIGHT + index * (height + gap)
     return pygame.Rect(
         overlay.x + OVERLAY_PAD,
         y,
         overlay.width - 2 * OVERLAY_PAD,
-        ROW_HEIGHT,
+        height,
     )
 
 
-def _rows_bottom(overlay: pygame.Rect, order_count: int) -> int:
-    if order_count <= 0:
+def _rows_bottom(
+    overlay: pygame.Rect,
+    count: int,
+    height: int,
+    gap: int,
+) -> int:
+    if count <= 0:
         return overlay.y + OVERLAY_PAD + TITLE_HEIGHT
-    return _order_row_rect(overlay, order_count - 1).bottom
+    return _content_row_rect(overlay, count - 1, height, gap).bottom
 
 
 def _order_label(order: Order) -> str:
