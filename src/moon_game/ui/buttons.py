@@ -8,7 +8,7 @@ from moon_game.assignment import can_assign
 from moon_game.commands import NextDay, Pause, StartDay
 from moon_game.entities import Order, Rover
 from moon_game.game_state import GamePhase, GameState
-from moon_game.ui.commands import Confirm, SelectOrder, ToggleOrders
+from moon_game.ui.commands import Confirm, SelectOrder, SelectRover, ToggleOrders
 
 OVERLAY_SIZE = (700, 440)
 OVERLAY_PAD = 24
@@ -16,6 +16,7 @@ TITLE_HEIGHT = 32
 ROW_HEIGHT = 40
 ROW_GAP = 8
 ROVER_CARD_GAP = 16
+ROVER_CARD_INNER_GAP = 12
 ROVER_CARD_HEIGHT = 72
 BUTTON_SIZE = (140, 40)
 BUTTON_GAP = 8
@@ -24,7 +25,7 @@ HUD_MARGIN = 16
 HUD_BUTTON_Y = 8
 
 type ButtonCommand = (
-    SelectOrder | Confirm | Pause | StartDay | NextDay | ToggleOrders
+    SelectOrder | SelectRover | Confirm | Pause | StartDay | NextDay | ToggleOrders
 )
 
 
@@ -65,13 +66,19 @@ def button_enabled(
         return state.phase is GamePhase.DAY_END
     return isinstance(
         command,
-        (SelectOrder, Pause, ToggleOrders),
+        (SelectOrder, SelectRover, Pause, ToggleOrders),
     )
 
 
-def button_selected(button: Button, selected_order_id: str | None) -> bool:
+def button_selected(
+    button: Button,
+    selected_order_id: str | None,
+    selected_rover_id: str | None,
+) -> bool:
     if isinstance(button.command, SelectOrder):
         return button.command.order_id == selected_order_id
+    if isinstance(button.command, SelectRover):
+        return button.command.rover_id == selected_rover_id
     return False
 
 
@@ -106,14 +113,19 @@ def overlay_rect(window_size: tuple[int, int]) -> pygame.Rect:
     )
 
 
-def rover_card_rect(overlay: pygame.Rect, order_count: int) -> pygame.Rect:
+def rover_card_rect(
+    overlay: pygame.Rect,
+    order_count: int,
+    index: int,
+    rover_count: int,
+) -> pygame.Rect:
     y = _rows_bottom(overlay, order_count) + ROVER_CARD_GAP
-    return pygame.Rect(
-        overlay.x + OVERLAY_PAD,
-        y,
-        overlay.width - 2 * OVERLAY_PAD,
-        ROVER_CARD_HEIGHT,
-    )
+    inner_width = overlay.width - 2 * OVERLAY_PAD
+    count = max(1, rover_count)
+    gap = ROVER_CARD_INNER_GAP if count > 1 else 0
+    width = (inner_width - gap * (count - 1)) // count
+    x = overlay.x + OVERLAY_PAD + index * (width + gap)
+    return pygame.Rect(x, y, width, ROVER_CARD_HEIGHT)
 
 
 def _hud_buttons(
@@ -133,6 +145,7 @@ def _overlay_buttons(
 ) -> list[Button]:
     overlay = overlay_rect(window_size)
     buttons = _order_rows(state, overlay)
+    buttons.extend(_rover_cards(state, overlay))
     close_index = 2 if state.phase is GamePhase.DAY_START else 1
     buttons.append(_close_button(overlay, close_index))
     if state.phase is GamePhase.DAY_START:
@@ -150,6 +163,21 @@ def _order_rows(state: GameState, overlay: pygame.Rect) -> list[Button]:
                 rect=_order_row_rect(overlay, index),
                 label=_order_label(order),
                 command=SelectOrder(order.id),
+            )
+        )
+    return buttons
+
+
+def _rover_cards(state: GameState, overlay: pygame.Rect) -> list[Button]:
+    buttons: list[Button] = []
+    rover_count = len(state.rovers)
+    for index, rover in enumerate(state.rovers):
+        buttons.append(
+            Button(
+                id=f"rover-{rover.id}",
+                rect=rover_card_rect(overlay, len(state.orders), index, rover_count),
+                label=rover.id,
+                command=SelectRover(rover.id),
             )
         )
     return buttons

@@ -15,7 +15,7 @@ def build_orders() -> list[Order]:
             id="samples",
             name="Samples",
             endpoint=CRATER,
-            weight=4,
+            weight=6,
             reward=80,
         ),
         Order(

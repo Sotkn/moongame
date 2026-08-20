@@ -6,6 +6,7 @@ import pygame
 
 from moon_game.asset_catalog import asset_path
 from moon_game.commands import (
+    DismissChoice,
     NextDay,
     Pause,
     PlayerCommand,
@@ -19,6 +20,7 @@ from moon_game.entities import (
     OrderStatus,
     Route,
     Rover,
+    RoverStatus,
 )
 from moon_game.game_state import GamePhase, GameState
 from moon_game.ui.buttons import (
@@ -31,7 +33,7 @@ from moon_game.ui.buttons import (
     overlay_title,
     rover_card_rect,
 )
-from moon_game.ui.commands import Confirm, SelectOrder, ToggleOrders
+from moon_game.ui.commands import Confirm, SelectOrder, SelectRover, ToggleOrders
 from moon_game.window_events import WindowEvent, WindowEventKind
 
 WINDOW_SIZE = (960, 540)
@@ -106,16 +108,14 @@ class Ui:
         pygame.quit()
 
     def _follow_state(self, state: GameState) -> None:
-        if self._selected_rover(state) is None:
-            self._selected_rover_id = state.rovers[0].id if state.rovers else None
+        self._drop_stale_rover_highlight(state)
         order = self._selected_order(state)
         if order is None or order.status is not OrderStatus.AVAILABLE:
             self._selected_order_id = None
-        if isinstance(state.pending_event, ChooseDelivery) and not isinstance(
-            self._last_pending, ChooseDelivery
-        ):
+        pending = state.pending_event
+        if isinstance(pending, ChooseDelivery) and pending != self._last_pending:
             self._orders_open = True
-            self._selected_rover_id = state.pending_event.rover.id
+            self._selected_rover_id = pending.rover.id
         if self._last_phase is GamePhase.DAY_END and state.phase is GamePhase.DAY_START:
             self._orders_open = True
             self._selected_order_id = None
@@ -123,6 +123,13 @@ class Ui:
             self._orders_open = False
         self._last_pending = state.pending_event
         self._last_phase = state.phase
+
+    def _drop_stale_rover_highlight(self, state: GameState) -> None:
+        if self._selected_rover_id is None:
+            return
+        if self._selected_rover(state) is not None:
+            return
+        self._selected_rover_id = state.rovers[0].id if state.rovers else None
 
     def _selected_rover(self, state: GameState) -> Rover | None:
         rover_id = self._selected_rover_id
@@ -166,6 +173,9 @@ class Ui:
         if isinstance(command, SelectOrder):
             self._selected_order_id = command.order_id
             return []
+        if isinstance(command, SelectRover):
+            self._selected_rover_id = command.rover_id
+            return []
         if isinstance(command, Confirm):
             return self._send_command(state)
         if isinstance(command, ToggleOrders):
@@ -183,7 +193,9 @@ class Ui:
 
     def _toggle_orders(self) -> list[PlayerCommand]:
         self._orders_open = not self._orders_open
-        return []
+        if self._orders_open:
+            return []
+        return [DismissChoice()]
 
     def _draw_map(self, state: GameState) -> None:
         self._screen.blit(self._image(state.map.image_key), (0, 0))
@@ -235,14 +247,28 @@ class Ui:
         pygame.draw.rect(self._screen, PANEL_BORDER, panel, width=2, border_radius=10)
         title = self._title_font.render(overlay_title(state), True, BUTTON_TEXT)
         self._screen.blit(title, (panel.x + 24, panel.y + 20))
-        card = rover_card_rect(panel, len(state.orders))
-        rover = self._selected_rover(state)
-        if rover is not None:
-            self._draw_rover_card(rover, card)
-        reason = overlay_reason(state, rover, self._selected_order(state))
+        rover_count = len(state.rovers)
+        for index, rover in enumerate(state.rovers):
+            card = rover_card_rect(panel, len(state.orders), index, rover_count)
+            self._draw_rover_card(
+                rover,
+                card,
+                selected=rover.id == self._selected_rover_id,
+            )
+        reason = overlay_reason(
+            state,
+            self._selected_rover(state),
+            self._selected_order(state),
+        )
         if reason:
             text = self._font.render(reason, True, REASON_COLOR)
-            self._screen.blit(text, (card.x, card.bottom + 12))
+            reason_x = panel.x + 24
+            reason_y = panel.y + 64
+            if rover_count:
+                card = rover_card_rect(panel, len(state.orders), 0, rover_count)
+                reason_x = card.x
+                reason_y = card.bottom + 12
+            self._screen.blit(text, (reason_x, reason_y))
 
     def _draw_day_end(self, state: GameState) -> None:
         self._screen.blit(self._dim, (0, 0))
@@ -292,16 +318,29 @@ class Ui:
             y += 24
         return y
 
-    def _draw_rover_card(self, rover: Rover, rect: pygame.Rect) -> None:
-        pygame.draw.rect(self._screen, ROVER_CARD_BG, rect, border_radius=8)
+    def _draw_rover_card(
+        self,
+        rover: Rover,
+        rect: pygame.Rect,
+        *,
+        selected: bool,
+    ) -> None:
+        fill = BUTTON_SELECTED if selected else ROVER_CARD_BG
+        pygame.draw.rect(self._screen, fill, rect, border_radius=8)
+        if selected:
+            pygame.draw.rect(self._screen, PANEL_BORDER, rect, width=2, border_radius=8)
         name = self._font.render(rover.id, True, BUTTON_TEXT)
-        self._screen.blit(name, (rect.x + 16, rect.y + 12))
+        self._screen.blit(name, (rect.x + 12, rect.y + 12))
+        status = self._font.render(_rover_status_label(rover), True, LABEL_COLOR)
+        status_rect = status.get_rect(topright=(rect.right - 12, rect.y + 12))
+        self._screen.blit(status, status_rect)
         cap = self._font.render(f"cap {rover.capacity}", True, LABEL_COLOR)
-        self._screen.blit(cap, (rect.x + 16, rect.y + 38))
-        self._draw_battery_bar(rect.x + 148, rect.y + 44, rover)
+        self._screen.blit(cap, (rect.x + 12, rect.y + 38))
+        bar_x = rect.x + 88
+        self._draw_battery_bar(bar_x, rect.y + 44, rover)
         battery = f"{rover.battery:.0f}/{rover.battery_max:.0f}"
         amount = self._font.render(battery, True, LABEL_COLOR)
-        self._screen.blit(amount, (rect.x + 240, rect.y + 38))
+        self._screen.blit(amount, (bar_x + 88, rect.y + 38))
 
     def _draw_buttons(self, state: GameState) -> None:
         for button in build_buttons(
@@ -309,13 +348,19 @@ class Ui:
             WINDOW_SIZE,
             orders_open=self._orders_open,
         ):
+            if isinstance(button.command, SelectRover):
+                continue
             enabled = button_enabled(
                 button,
                 state,
                 self._selected_rover(state),
                 self._selected_order(state),
             )
-            selected = button_selected(button, self._selected_order_id)
+            selected = button_selected(
+                button,
+                self._selected_order_id,
+                self._selected_rover_id,
+            )
             if selected:
                 color = BUTTON_SELECTED
             elif enabled:
@@ -388,6 +433,12 @@ class Ui:
 
 def _summary_order_label(order: Order) -> str:
     return f"{order.name}  {order.endpoint.name}  ${order.reward}"
+
+
+def _rover_status_label(rover: Rover) -> str:
+    if rover.status is RoverStatus.IDLE:
+        return "idle"
+    return "on a trip"
 
 
 def _fit_sprite(surface: pygame.Surface, max_size: int) -> pygame.Surface:

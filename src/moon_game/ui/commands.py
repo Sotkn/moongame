@@ -7,6 +7,11 @@ class SelectOrder:
 
 
 @dataclass(frozen=True)
+class SelectRover:
+    rover_id: str
+
+
+@dataclass(frozen=True)
 class Confirm:
     pass
 
