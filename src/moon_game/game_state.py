@@ -45,6 +45,18 @@ class GameState:
     day_elapsed: float = 0.0
     day_length: float = DAY_LENGTH
 
+    def rover_by_id(self, rover_id: str) -> Rover | None:
+        for rover in self.rovers:
+            if rover.id == rover_id:
+                return rover
+        return None
+
+    def order_by_id(self, order_id: str) -> Order | None:
+        for order in self.orders:
+            if order.id == order_id:
+                return order
+        return None
+
     def start_delivery(self, rover: Rover, order: Order) -> None:
         if rover not in self.rovers or order not in self.orders:
             return

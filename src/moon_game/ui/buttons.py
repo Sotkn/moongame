@@ -69,9 +69,9 @@ def button_enabled(
     )
 
 
-def button_selected(button: Button, selected_order: Order | None) -> bool:
+def button_selected(button: Button, selected_order_id: str | None) -> bool:
     if isinstance(button.command, SelectOrder):
-        return button.command.order is selected_order
+        return button.command.order_id == selected_order_id
     return False
 
 
@@ -149,7 +149,7 @@ def _order_rows(state: GameState, overlay: pygame.Rect) -> list[Button]:
                 id=f"order-{order.id}",
                 rect=_order_row_rect(overlay, index),
                 label=_order_label(order),
-                command=SelectOrder(order),
+                command=SelectOrder(order.id),
             )
         )
     return buttons

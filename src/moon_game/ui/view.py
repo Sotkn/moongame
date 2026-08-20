@@ -66,8 +66,8 @@ class Ui:
         self._font = pygame.font.SysFont("segoe ui", 18)
         self._title_font = pygame.font.SysFont("segoe ui", 22)
         self._images: dict[str, pygame.Surface] = {}
-        self._selected_order: Order | None = None
-        self._selected_rover: Rover | None = None
+        self._selected_order_id: str | None = None
+        self._selected_rover_id: str | None = None
         self._orders_open = True
         self._last_phase: GamePhase | None = None
         self._last_pending: ChooseDelivery | None = None
@@ -107,19 +107,35 @@ class Ui:
         pygame.quit()
 
     def _follow_state(self, state: GameState) -> None:
-        if self._selected_rover not in state.rovers:
-            self._selected_rover = state.rovers[0] if state.rovers else None
+        if self._selected_rover(state) is None:
+            self._selected_rover_id = state.rovers[0].id if state.rovers else None
+        order = self._selected_order(state)
+        if order is None or order.status is not OrderStatus.AVAILABLE:
+            self._selected_order_id = None
         if isinstance(state.pending_event, ChooseDelivery) and not isinstance(
             self._last_pending, ChooseDelivery
         ):
             self._orders_open = True
-            self._selected_rover = state.pending_event.rover
+            self._selected_rover_id = state.pending_event.rover.id
         if self._last_phase is GamePhase.DAY_END and state.phase is GamePhase.DAY_START:
             self._orders_open = True
+            self._selected_order_id = None
         if state.phase is GamePhase.DAY_END:
             self._orders_open = False
         self._last_pending = state.pending_event
         self._last_phase = state.phase
+
+    def _selected_rover(self, state: GameState) -> Rover | None:
+        rover_id = self._selected_rover_id
+        if rover_id is None:
+            return None
+        return state.rover_by_id(rover_id)
+
+    def _selected_order(self, state: GameState) -> Order | None:
+        order_id = self._selected_order_id
+        if order_id is None:
+            return None
+        return state.order_by_id(order_id)
 
     def _commands_from_click(
         self,
@@ -133,19 +149,26 @@ class Ui:
             if not button.rect.collidepoint(event.position):
                 continue
             if not button_enabled(
-                button, state, self._selected_rover, self._selected_order
+                button,
+                state,
+                self._selected_rover(state),
+                self._selected_order(state),
             ):
                 continue
-            return self._commands_from_button(button)
+            return self._commands_from_button(button, state)
         return []
 
-    def _commands_from_button(self, button: Button) -> list[PlayerCommand]:
+    def _commands_from_button(
+        self,
+        button: Button,
+        state: GameState,
+    ) -> list[PlayerCommand]:
         command = button.command
         if isinstance(command, SelectOrder):
-            self._selected_order = command.order
+            self._selected_order_id = command.order_id
             return []
         if isinstance(command, Confirm):
-            return self._send_command()
+            return self._send_command(state)
         if isinstance(command, ToggleOrders):
             return self._toggle_orders()
         if isinstance(command, DismissChoice):
@@ -155,9 +178,9 @@ class Ui:
             return [command]
         return []
 
-    def _send_command(self) -> list[PlayerCommand]:
-        rover = self._selected_rover
-        order = self._selected_order
+    def _send_command(self, state: GameState) -> list[PlayerCommand]:
+        rover = self._selected_rover(state)
+        order = self._selected_order(state)
         if rover is None or order is None:
             return []
         return [StartDelivery(rover, order)]
@@ -220,10 +243,10 @@ class Ui:
         title = self._title_font.render(overlay_title(state), True, BUTTON_TEXT)
         self._screen.blit(title, (panel.x + 24, panel.y + 20))
         card = rover_card_rect(panel, len(state.orders))
-        rover = self._selected_rover
+        rover = self._selected_rover(state)
         if rover is not None:
             self._draw_rover_card(rover, card)
-        reason = overlay_reason(state, rover, self._selected_order)
+        reason = overlay_reason(state, rover, self._selected_order(state))
         if reason:
             text = self._font.render(reason, True, REASON_COLOR)
             self._screen.blit(text, (card.x, card.bottom + 12))
@@ -294,9 +317,12 @@ class Ui:
             orders_open=self._orders_open,
         ):
             enabled = button_enabled(
-                button, state, self._selected_rover, self._selected_order
+                button,
+                state,
+                self._selected_rover(state),
+                self._selected_order(state),
             )
-            selected = button_selected(button, self._selected_order)
+            selected = button_selected(button, self._selected_order_id)
             if selected:
                 color = BUTTON_SELECTED
             elif enabled:

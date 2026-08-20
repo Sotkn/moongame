@@ -25,6 +25,10 @@ class AssignResult:
 
 
 def can_assign(state: GameState, rover: Rover, order: Order) -> AssignResult:
+    if rover not in state.rovers:
+        return AssignResult(False, "Rover is not available")
+    if order not in state.orders:
+        return AssignResult(False, "Order is not available")
     if rover.status is not RoverStatus.IDLE:
         return AssignResult(False, "Rover is busy")
     if rover.position != state.map.base:
