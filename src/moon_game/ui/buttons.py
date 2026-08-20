@@ -5,12 +5,13 @@ from dataclasses import dataclass
 import pygame
 
 from moon_game.assignment import can_assign
-from moon_game.commands import NextDay, Pause, StartDay
-from moon_game.entities import Order, Rover
+from moon_game.commands import BuyRover, NextDay, Pause, StartDay
+from moon_game.entities import Order, Rover, ShopOffer
 from moon_game.game_state import GamePhase, GameState
+from moon_game.purchase import can_buy
 from moon_game.ui.commands import Confirm, SelectOrder, SelectRover, ToggleOrders
 
-OVERLAY_SIZE = (700, 440)
+OVERLAY_SIZE = (800, 480)
 OVERLAY_PAD = 24
 TITLE_HEIGHT = 32
 ROW_HEIGHT = 40
@@ -25,7 +26,14 @@ HUD_MARGIN = 16
 HUD_BUTTON_Y = 8
 
 type ButtonCommand = (
-    SelectOrder | SelectRover | Confirm | Pause | StartDay | NextDay | ToggleOrders
+    SelectOrder
+    | SelectRover
+    | Confirm
+    | Pause
+    | StartDay
+    | NextDay
+    | ToggleOrders
+    | BuyRover
 )
 
 
@@ -64,6 +72,8 @@ def button_enabled(
         return state.phase is GamePhase.DAY_START
     if isinstance(command, NextDay):
         return state.phase is GamePhase.DAY_END
+    if isinstance(command, BuyRover):
+        return _buy_enabled(state, command.offer)
     return isinstance(
         command,
         (SelectOrder, SelectRover, Pause, ToggleOrders),
@@ -113,13 +123,37 @@ def overlay_rect(window_size: tuple[int, int]) -> pygame.Rect:
     )
 
 
-def rover_card_rect(
+def shop_row_rect(
     overlay: pygame.Rect,
     order_count: int,
     index: int,
+) -> pygame.Rect:
+    return _order_row_rect(overlay, order_count + index)
+
+
+def shop_buy_rect(
+    overlay: pygame.Rect,
+    order_count: int,
+    index: int,
+) -> pygame.Rect:
+    row = shop_row_rect(overlay, order_count, index)
+    width, height = BUTTON_SIZE
+    return pygame.Rect(
+        row.right - width,
+        row.y,
+        width,
+        height,
+    )
+
+
+def rover_card_rect(
+    overlay: pygame.Rect,
+    order_count: int,
+    shop_count: int,
+    index: int,
     rover_count: int,
 ) -> pygame.Rect:
-    y = _rows_bottom(overlay, order_count) + ROVER_CARD_GAP
+    y = _rows_bottom(overlay, order_count + shop_count) + ROVER_CARD_GAP
     inner_width = overlay.width - 2 * OVERLAY_PAD
     count = max(1, rover_count)
     gap = ROVER_CARD_INNER_GAP if count > 1 else 0
@@ -145,6 +179,7 @@ def _overlay_buttons(
 ) -> list[Button]:
     overlay = overlay_rect(window_size)
     buttons = _order_rows(state, overlay)
+    buttons.extend(_shop_rows(state, overlay))
     buttons.extend(_rover_cards(state, overlay))
     close_index = 2 if state.phase is GamePhase.DAY_START else 1
     buttons.append(_close_button(overlay, close_index))
@@ -168,14 +203,36 @@ def _order_rows(state: GameState, overlay: pygame.Rect) -> list[Button]:
     return buttons
 
 
+def _shop_rows(state: GameState, overlay: pygame.Rect) -> list[Button]:
+    buttons: list[Button] = []
+    order_count = len(state.orders)
+    for index, offer in enumerate(state.shop_offers):
+        buttons.append(
+            Button(
+                id=f"buy-{offer.id}",
+                rect=shop_buy_rect(overlay, order_count, index),
+                label="Buy",
+                command=BuyRover(offer),
+            )
+        )
+    return buttons
+
+
 def _rover_cards(state: GameState, overlay: pygame.Rect) -> list[Button]:
     buttons: list[Button] = []
     rover_count = len(state.rovers)
+    shop_count = len(state.shop_offers)
     for index, rover in enumerate(state.rovers):
         buttons.append(
             Button(
                 id=f"rover-{rover.id}",
-                rect=rover_card_rect(overlay, len(state.orders), index, rover_count),
+                rect=rover_card_rect(
+                    overlay,
+                    len(state.orders),
+                    shop_count,
+                    index,
+                    rover_count,
+                ),
                 label=rover.id,
                 command=SelectRover(rover.id),
             )
@@ -262,6 +319,12 @@ def _send_enabled(
     if selected_rover is None or selected_order is None:
         return False
     return can_assign(state, selected_rover, selected_order).allowed
+
+
+def _buy_enabled(state: GameState, offer: ShopOffer) -> bool:
+    if state.phase not in (GamePhase.DAY_START, GamePhase.RUNNING):
+        return False
+    return can_buy(state, offer).allowed
 
 
 def _overlay_action_rect(overlay: pygame.Rect, index_from_right: int) -> pygame.Rect:

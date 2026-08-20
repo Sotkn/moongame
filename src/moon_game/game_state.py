@@ -16,13 +16,16 @@ from moon_game.entities import (
     Route,
     Rover,
     RoverStatus,
+    ShopOffer,
 )
 from moon_game.geometry import Vec2
+from moon_game.purchase import can_buy
 from moon_game.world.day import DAY_LENGTH
 from moon_game.world.endpoints import ENDPOINTS
 from moon_game.world.orders import build_orders
 from moon_game.world.routes import build_routes
 from moon_game.world.rovers import build_rovers
+from moon_game.world.shop import build_shop_offers
 
 
 class GamePhase(Enum):
@@ -38,6 +41,7 @@ class GameState:
     rovers: list[Rover]
     routes: list[Route]
     orders: list[Order]
+    shop_offers: list[ShopOffer] = field(default_factory=list)
     deliveries: list[Delivery] = field(default_factory=list)
     money: int = 0
     phase: GamePhase = GamePhase.DAY_START
@@ -71,6 +75,23 @@ class GameState:
         order.status = OrderStatus.IN_PROGRESS
         self.deliveries.append(Delivery(rover=rover, order=order, route=route))
 
+    def buy_rover(self, offer: ShopOffer) -> None:
+        if not can_buy(self, offer).allowed:
+            return
+        self.money -= offer.price
+        self.shop_offers.remove(offer)
+        self.rovers.append(
+            Rover(
+                id=offer.id,
+                position=self.map.base,
+                speed=offer.speed,
+                image_key=offer.image_key,
+                capacity=offer.capacity,
+                battery=offer.battery_max,
+                battery_max=offer.battery_max,
+            )
+        )
+
     def start_next_day(self, orders: list[Order]) -> None:
         self.day_number += 1
         self.orders = orders
@@ -103,6 +124,7 @@ def initial_state() -> GameState:
         rovers=build_rovers(play_map),
         routes=build_routes(play_map),
         orders=build_orders(),
+        shop_offers=build_shop_offers(),
         day_length=DAY_LENGTH,
     )
 

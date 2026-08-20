@@ -6,6 +6,7 @@ import pygame
 
 from moon_game.asset_catalog import asset_path
 from moon_game.commands import (
+    BuyRover,
     DismissChoice,
     NextDay,
     Pause,
@@ -21,8 +22,10 @@ from moon_game.entities import (
     Route,
     Rover,
     RoverStatus,
+    ShopOffer,
 )
 from moon_game.game_state import GamePhase, GameState
+from moon_game.purchase import can_buy
 from moon_game.ui.buttons import (
     Button,
     build_buttons,
@@ -32,6 +35,8 @@ from moon_game.ui.buttons import (
     overlay_rect,
     overlay_title,
     rover_card_rect,
+    shop_buy_rect,
+    shop_row_rect,
 )
 from moon_game.ui.commands import Confirm, SelectOrder, SelectRover, ToggleOrders
 from moon_game.window_events import WindowEvent, WindowEventKind
@@ -180,6 +185,9 @@ class Ui:
             return self._send_command(state)
         if isinstance(command, ToggleOrders):
             return self._toggle_orders()
+        if isinstance(command, BuyRover):
+            self._selected_rover_id = command.offer.id
+            return [command]
         if isinstance(command, (Pause, StartDay, NextDay)):
             return [command]
         return []
@@ -247,9 +255,17 @@ class Ui:
         pygame.draw.rect(self._screen, PANEL_BORDER, panel, width=2, border_radius=10)
         title = self._title_font.render(overlay_title(state), True, BUTTON_TEXT)
         self._screen.blit(title, (panel.x + 24, panel.y + 20))
+        self._draw_shop_rows(state, panel)
         rover_count = len(state.rovers)
+        shop_count = len(state.shop_offers)
         for index, rover in enumerate(state.rovers):
-            card = rover_card_rect(panel, len(state.orders), index, rover_count)
+            card = rover_card_rect(
+                panel,
+                len(state.orders),
+                shop_count,
+                index,
+                rover_count,
+            )
             self._draw_rover_card(
                 rover,
                 card,
@@ -265,10 +281,34 @@ class Ui:
             reason_x = panel.x + 24
             reason_y = panel.y + 64
             if rover_count:
-                card = rover_card_rect(panel, len(state.orders), 0, rover_count)
+                card = rover_card_rect(
+                    panel,
+                    len(state.orders),
+                    shop_count,
+                    0,
+                    rover_count,
+                )
                 reason_x = card.x
                 reason_y = card.bottom + 12
             self._screen.blit(text, (reason_x, reason_y))
+
+    def _draw_shop_rows(self, state: GameState, panel: pygame.Rect) -> None:
+        order_count = len(state.orders)
+        for index, offer in enumerate(state.shop_offers):
+            row = shop_row_rect(panel, order_count, index)
+            pygame.draw.rect(self._screen, ROVER_CARD_BG, row, border_radius=6)
+            stats = self._font.render(_shop_label(offer), True, BUTTON_TEXT)
+            self._screen.blit(
+                stats,
+                stats.get_rect(midleft=(row.x + 12, row.centery)),
+            )
+            result = can_buy(state, offer)
+            if result.allowed:
+                continue
+            reason = self._font.render(result.reason, True, REASON_COLOR)
+            buy = shop_buy_rect(panel, order_count, index)
+            dest = reason.get_rect(midright=(buy.x - 12, row.centery))
+            self._screen.blit(reason, dest)
 
     def _draw_day_end(self, state: GameState) -> None:
         self._screen.blit(self._dim, (0, 0))
@@ -429,6 +469,12 @@ class Ui:
                 loaded = _fit_sprite(loaded, SPRITE_MAX_SIZE[key])
             self._images[key] = loaded
         return loaded
+
+
+def _shop_label(offer: ShopOffer) -> str:
+    return (
+        f"{offer.id}  cap {offer.capacity}  bat {offer.battery_max:.0f}  ${offer.price}"
+    )
 
 
 def _summary_order_label(order: Order) -> str:

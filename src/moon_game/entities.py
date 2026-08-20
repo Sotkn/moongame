@@ -49,6 +49,16 @@ class Rover:
 
 
 @dataclass(frozen=True)
+class ShopOffer:
+    id: str
+    capacity: int
+    battery_max: float
+    speed: float
+    image_key: str
+    price: int
+
+
+@dataclass(frozen=True)
 class Endpoint:
     id: str
     name: str

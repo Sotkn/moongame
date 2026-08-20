@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 
-from moon_game.entities import ChooseDelivery, Order, Rover
+from moon_game.entities import ChooseDelivery, Order, Rover, ShopOffer
 from moon_game.game_state import GamePhase, GameState, prepare_next_day
 
 
@@ -54,4 +54,16 @@ class NextDay:
         prepare_next_day(state)
 
 
-type PlayerCommand = StartDelivery | StartDay | DismissChoice | Pause | NextDay
+@dataclass(frozen=True)
+class BuyRover:
+    offer: ShopOffer
+
+    def apply(self, state: GameState) -> None:
+        if state.phase not in (GamePhase.DAY_START, GamePhase.RUNNING):
+            return
+        state.buy_rover(self.offer)
+
+
+type PlayerCommand = (
+    StartDelivery | StartDay | DismissChoice | Pause | NextDay | BuyRover
+)
