@@ -23,6 +23,12 @@ class DeliveryState(Enum):
     COMPLETED = "completed"
 
 
+class OrderStatus(Enum):
+    AVAILABLE = "available"
+    IN_PROGRESS = "in_progress"
+    COMPLETED = "completed"
+
+
 @dataclass(frozen=True)
 class Map:
     id: str
@@ -36,6 +42,9 @@ class Rover:
     position: Vec2
     speed: float
     image_key: str
+    capacity: int
+    battery: float
+    battery_max: float
     status: RoverStatus = RoverStatus.IDLE
 
 
@@ -44,6 +53,16 @@ class Endpoint:
     id: str
     name: str
     position: Vec2
+
+
+@dataclass
+class Order:
+    id: str
+    name: str
+    endpoint: Endpoint
+    weight: int
+    reward: int
+    status: OrderStatus = OrderStatus.AVAILABLE
 
 
 @dataclass(frozen=True)
@@ -89,6 +108,7 @@ class Route:
 @dataclass
 class Delivery:
     rover: Rover
+    order: Order
     route: Route
     progress: float = 0.0
     direction: DeliveryDirection = DeliveryDirection.TO_DESTINATION

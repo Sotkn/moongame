@@ -1,7 +1,7 @@
 from moon_game.clock import FrameClock
-from moon_game.game_state import GamePhase, GameState
+from moon_game.game_state import GameState
 from moon_game.simulation import Simulation
-from moon_game.ui import Pause, PlayerCommand, StartRoute, Ui
+from moon_game.ui import Pause, PlayerCommand, StartDelivery, Ui
 from moon_game.window_events import WindowEventKind, poll_window_events
 
 
@@ -29,10 +29,10 @@ class Session:
             self._execute_one(command)
 
     def _execute_one(self, command: PlayerCommand) -> None:
-        if isinstance(command, StartRoute):
-            self._state.start_delivery(command.route)
+        if isinstance(command, StartDelivery):
+            self._state.start_delivery(command.rover, command.order)
         elif isinstance(command, Pause):
             self._state.toggle_pause()
 
     def _should_tick(self) -> bool:
-        return self._state.phase is GamePhase.EXECUTION and not self._state.paused
+        return not self._state.paused

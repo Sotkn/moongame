@@ -1,18 +1,29 @@
 from __future__ import annotations
 
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from enum import Enum
 
-from moon_game.entities import Delivery, Endpoint, Map, Route, Rover, RoverStatus
+from moon_game.assignment import can_assign, route_for_order
+from moon_game.entities import (
+    Delivery,
+    Endpoint,
+    Map,
+    Order,
+    OrderStatus,
+    Route,
+    Rover,
+    RoverStatus,
+)
 from moon_game.geometry import Vec2
 from moon_game.world.endpoints import ENDPOINTS
+from moon_game.world.orders import build_orders
 from moon_game.world.routes import build_routes
 from moon_game.world.rovers import build_rovers
 
 
 class GamePhase(Enum):
-    PLANNING = "planning"
-    EXECUTION = "execution"
+    PREP = "prep"
+    RUNNING = "running"
 
 
 @dataclass
@@ -21,30 +32,28 @@ class GameState:
     endpoints: list[Endpoint]
     rovers: list[Rover]
     routes: list[Route]
-    delivery: Delivery | None = None
-    phase: GamePhase = GamePhase.PLANNING
-    paused: bool = False
+    orders: list[Order]
+    deliveries: list[Delivery] = field(default_factory=list)
+    money: int = 0
+    phase: GamePhase = GamePhase.PREP
+    paused: bool = True
 
-    def start_delivery(self, route: Route) -> None:
-        if route not in self.routes:
+    def start_delivery(self, rover: Rover, order: Order) -> None:
+        if rover not in self.rovers or order not in self.orders:
             return
-        rover = self._idle_rover()
-        if rover is None:
+        if not can_assign(self, rover, order).allowed:
+            return
+        route = route_for_order(self, order)
+        if route is None:
             return
         rover.status = RoverStatus.EN_ROUTE
-        self.delivery = Delivery(rover=rover, route=route)
-        self.phase = GamePhase.EXECUTION
+        order.status = OrderStatus.IN_PROGRESS
+        self.deliveries.append(Delivery(rover=rover, order=order, route=route))
 
     def toggle_pause(self) -> None:
-        if self.phase is not GamePhase.EXECUTION:
-            return
         self.paused = not self.paused
-
-    def _idle_rover(self) -> Rover | None:
-        for rover in self.rovers:
-            if rover.status is RoverStatus.IDLE:
-                return rover
-        return None
+        if not self.paused:
+            self.phase = GamePhase.RUNNING
 
 
 def load_state() -> GameState:
@@ -58,4 +67,5 @@ def initial_state() -> GameState:
         endpoints=list(ENDPOINTS),
         rovers=build_rovers(play_map),
         routes=build_routes(play_map),
+        orders=build_orders(),
     )
