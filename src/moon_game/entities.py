@@ -53,6 +53,7 @@ class Endpoint:
     id: str
     name: str
     position: Vec2
+    image_key: str
 
 
 @dataclass

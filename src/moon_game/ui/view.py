@@ -26,8 +26,6 @@ from moon_game.window_events import WindowEvent, WindowEventKind
 
 WINDOW_SIZE = (960, 540)
 ROUTE_COLOR = (92, 98, 112)
-BASE_COLOR = (196, 202, 214)
-DESTINATION_COLOR = (220, 168, 72)
 BUTTON_IDLE = (70, 92, 122)
 BUTTON_SELECTED = (110, 150, 190)
 BUTTON_DISABLED = (48, 54, 64)
@@ -36,6 +34,13 @@ LABEL_COLOR = (168, 174, 186)
 REASON_COLOR = (220, 140, 96)
 BATTERY_BACK = (42, 46, 54)
 BATTERY_FILL = (88, 176, 124)
+SPRITE_MAX_SIZE = {
+    "rover": 48,
+    "base": 88,
+    "poi1": 56,
+    "poi2": 56,
+    "poi3": 56,
+}
 
 
 class Ui:
@@ -117,31 +122,42 @@ class Ui:
             self._draw_route(route)
         for endpoint in state.endpoints:
             self._draw_endpoint(endpoint)
-        pygame.draw.circle(
-            self._screen,
-            BASE_COLOR,
+        self._draw_marker(
+            self._image("base"),
             state.map.base.to_int_tuple(),
-            14,
+            "Base",
+            above=False,
         )
-        self._draw_label("Base", state.map.base.to_int_tuple(), (0, 22))
 
     def _draw_route(self, route: Route) -> None:
         points = [point.to_int_tuple() for point in route.waypoints]
         pygame.draw.lines(self._screen, ROUTE_COLOR, False, points, 3)
 
     def _draw_endpoint(self, endpoint: Endpoint) -> None:
-        pygame.draw.circle(
-            self._screen,
-            DESTINATION_COLOR,
+        self._draw_marker(
+            self._image(endpoint.image_key),
             endpoint.position.to_int_tuple(),
-            12,
+            endpoint.name,
+            above=True,
         )
-        self._draw_label(endpoint.name, endpoint.position.to_int_tuple(), (0, -28))
 
     def _draw_rover(self, rover: Rover) -> None:
         image = self._image(rover.image_key)
         rect = image.get_rect(center=rover.position.to_int_tuple())
         self._screen.blit(image, rect)
+
+    def _draw_marker(
+        self,
+        image: pygame.Surface,
+        origin: tuple[int, int],
+        label: str,
+        *,
+        above: bool,
+    ) -> None:
+        rect = image.get_rect(center=origin)
+        self._screen.blit(image, rect)
+        offset_y = -rect.height // 2 - 14 if above else rect.height // 2 + 14
+        self._draw_label(label, origin, (0, offset_y))
 
     def _draw_buttons(self, state: GameState) -> None:
         for button in build_buttons(state, WINDOW_SIZE):
@@ -222,5 +238,20 @@ class Ui:
         loaded = self._images.get(key)
         if loaded is None:
             loaded = pygame.image.load(asset_path(key)).convert_alpha()
+            if key == "map":
+                loaded = pygame.transform.smoothscale(loaded, WINDOW_SIZE)
+            else:
+                loaded = _fit_sprite(loaded, SPRITE_MAX_SIZE[key])
             self._images[key] = loaded
         return loaded
+
+
+def _fit_sprite(surface: pygame.Surface, max_size: int) -> pygame.Surface:
+    bounds = surface.get_bounding_rect(min_alpha=127)
+    if bounds.width == 0 or bounds.height == 0:
+        return surface
+    cropped = surface.subsurface(bounds).copy()
+    width, height = cropped.get_size()
+    scale = max_size / max(width, height)
+    size = (max(1, round(width * scale)), max(1, round(height * scale)))
+    return pygame.transform.smoothscale(cropped, size)
