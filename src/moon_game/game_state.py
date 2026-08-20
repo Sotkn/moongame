@@ -1,3 +1,5 @@
+"""Mutable world state for the current session."""
+
 from __future__ import annotations
 
 from dataclasses import dataclass, field

@@ -28,6 +28,8 @@ type SimEvent = DeliveryCompleted | DayEnded
 
 
 class Simulation:
+    """Advances the world each frame. tick() returns SimEvents for Session to apply."""
+
     def tick(self, state: GameState, dt: float) -> list[SimEvent]:
         if state.phase is not GamePhase.RUNNING:
             return []

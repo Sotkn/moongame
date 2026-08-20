@@ -1,3 +1,5 @@
+"""Frame loop. Simulation.tick() returns SimEvents; Session applies them."""
+
 from moon_game.clock import FrameClock
 from moon_game.commands import PlayerCommand
 from moon_game.entities import ChooseDelivery
@@ -24,8 +26,10 @@ class Session:
             for command in commands:
                 command.apply(self._state)
             if self._should_tick():
-                for event in self._simulation.tick(self._state, dt):
-                    self._apply_sim_event(event)
+                # tick moves the world and returns events that happened this frame
+                sim_events = self._simulation.tick(self._state, dt)
+                for sim_event in sim_events:
+                    self._apply_sim_event(sim_event)
             self._ui.draw(self._state)
 
     def _should_tick(self) -> bool:
