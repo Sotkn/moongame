@@ -5,9 +5,10 @@ from dataclasses import dataclass
 import pygame
 
 from moon_game.assignment import can_assign
+from moon_game.commands import DismissChoice, Pause
 from moon_game.entities import ChooseDelivery, Order
 from moon_game.game_state import GamePhase, GameState
-from moon_game.ui.commands import Confirm, DismissChoice, Pause, SelectOrder
+from moon_game.ui.commands import Confirm, SelectOrder
 
 OVERLAY_SIZE = (700, 440)
 OVERLAY_PAD = 24

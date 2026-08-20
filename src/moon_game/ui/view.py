@@ -5,8 +5,16 @@ from collections.abc import Sequence
 import pygame
 
 from moon_game.asset_catalog import asset_path
-from moon_game.entities import Endpoint, Order, Route, Rover
-from moon_game.game_state import GameState
+from moon_game.commands import (
+    DismissChoice,
+    Pause,
+    PlayerCommand,
+    ResumeFromChoice,
+    StartDay,
+    StartDelivery,
+)
+from moon_game.entities import ChooseDelivery, Endpoint, Order, Route, Rover
+from moon_game.game_state import GamePhase, GameState
 from moon_game.ui.buttons import (
     Button,
     build_buttons,
@@ -17,14 +25,7 @@ from moon_game.ui.buttons import (
     overlay_title,
     rover_card_rect,
 )
-from moon_game.ui.commands import (
-    Confirm,
-    DismissChoice,
-    Pause,
-    PlayerCommand,
-    SelectOrder,
-    StartDelivery,
-)
+from moon_game.ui.commands import Confirm, SelectOrder
 from moon_game.window_events import WindowEvent, WindowEventKind
 
 WINDOW_SIZE = (960, 540)
@@ -72,9 +73,7 @@ class Ui:
         buttons = build_buttons(state, WINDOW_SIZE)
         commands: list[PlayerCommand] = []
         for event in events:
-            command = self._command_from_click(event, buttons, state)
-            if command is not None:
-                commands.append(command)
+            commands.extend(self._commands_from_click(event, buttons, state))
         return commands
 
     def draw(self, state: GameState) -> None:
@@ -90,39 +89,47 @@ class Ui:
     def close(self) -> None:
         pygame.quit()
 
-    def _command_from_click(
+    def _commands_from_click(
         self,
         event: WindowEvent,
         buttons: Sequence[Button],
         state: GameState,
-    ) -> PlayerCommand | None:
+    ) -> list[PlayerCommand]:
         if event.kind is not WindowEventKind.CLICK or event.position is None:
-            return None
+            return []
         for button in buttons:
             if not button.rect.collidepoint(event.position):
                 continue
             if not button_enabled(button, state, self._selected_order):
                 continue
-            return self._command_from_button(button, state)
-        return None
+            return self._commands_from_button(button, state)
+        return []
 
-    def _command_from_button(
+    def _commands_from_button(
         self,
         button: Button,
         state: GameState,
-    ) -> PlayerCommand | None:
+    ) -> list[PlayerCommand]:
         command = button.command
         if isinstance(command, SelectOrder):
             self._selected_order = command.order
-            return None
+            return []
         if isinstance(command, Confirm):
-            order = self._selected_order
-            if order is None:
-                return None
-            return StartDelivery(state.day_rover(), order)
+            return self._commit_commands(state)
         if isinstance(command, (DismissChoice, Pause)):
-            return command
-        return None
+            return [command]
+        return []
+
+    def _commit_commands(self, state: GameState) -> list[PlayerCommand]:
+        order = self._selected_order
+        if order is None:
+            return []
+        commands: list[PlayerCommand] = [StartDelivery(state.day_rover(), order)]
+        if state.phase is GamePhase.DAY_START:
+            commands.append(StartDay())
+        elif isinstance(state.pending_event, ChooseDelivery):
+            commands.append(ResumeFromChoice())
+        return commands
 
     def _draw_map(self, state: GameState) -> None:
         self._screen.blit(self._image(state.map.image_key), (0, 0))
