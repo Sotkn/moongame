@@ -5,6 +5,7 @@ from collections.abc import Sequence
 import pygame
 
 from moon_game.asset_catalog import asset_path
+from moon_game.assignment import routes_for_order
 from moon_game.commands import (
     BuyRover,
     DismissChoice,
@@ -35,6 +36,7 @@ from moon_game.ui.buttons import (
     button_selected,
     overlay_reason,
     overlay_rect,
+    route_button_rect,
     rover_card_rect,
     shop_buy_rect,
     shop_job_row_rect,
@@ -47,6 +49,7 @@ from moon_game.ui.commands import (
     Confirm,
     OpenPanel,
     SelectOrder,
+    SelectRoute,
     SelectRover,
     ToggleAssign,
     ToggleShop,
@@ -55,6 +58,7 @@ from moon_game.window_events import WindowEvent, WindowEventKind
 
 WINDOW_SIZE = (960, 540)
 ROUTE_COLOR = (92, 98, 112)
+ROUTE_HIGHLIGHT = (168, 196, 224)
 BUTTON_IDLE = (70, 92, 122)
 BUTTON_SELECTED = (110, 150, 190)
 BUTTON_DISABLED = (48, 54, 64)
@@ -88,6 +92,7 @@ class Ui:
         self._images: dict[str, pygame.Surface] = {}
         self._selected_order_id: str | None = None
         self._selected_rover_id: str | None = None
+        self._selected_route_id: str | None = None
         self._open_panel = OpenPanel.ASSIGNMENT
         self._last_phase: GamePhase | None = None
         self._last_pending: ChooseDelivery | None = None
@@ -104,6 +109,7 @@ class Ui:
             state,
             WINDOW_SIZE,
             open_panel=self._open_panel,
+            selected_order=self._selected_order(state),
         )
         commands: list[PlayerCommand] = []
         for event in events:
@@ -130,9 +136,6 @@ class Ui:
 
     def _follow_state(self, state: GameState) -> None:
         self._drop_stale_rover_highlight(state)
-        order = self._selected_order(state)
-        if order is None or order.status is not OrderStatus.AVAILABLE:
-            self._selected_order_id = None
         pending = state.pending_event
         if isinstance(pending, ChooseDelivery) and pending != self._last_pending:
             self._open_panel = OpenPanel.ASSIGNMENT
@@ -140,10 +143,17 @@ class Ui:
         if self._last_phase is GamePhase.DAY_END and state.phase is GamePhase.DAY_START:
             self._open_panel = OpenPanel.ASSIGNMENT
             self._selected_order_id = None
+            self._selected_route_id = None
         if state.phase is GamePhase.DAY_END:
             self._open_panel = OpenPanel.NONE
         self._last_pending = state.pending_event
         self._last_phase = state.phase
+        order = self._selected_order(state)
+        if order is None or order.status is not OrderStatus.AVAILABLE:
+            self._selected_order_id = None
+            self._selected_route_id = None
+            return
+        self._highlight_route_for_order(state, order)
 
     def _drop_stale_rover_highlight(self, state: GameState) -> None:
         if self._selected_rover_id is None:
@@ -164,6 +174,25 @@ class Ui:
             return None
         return state.order_by_id(order_id)
 
+    def _selected_route(self, state: GameState) -> Route | None:
+        route_id = self._selected_route_id
+        if route_id is None:
+            return None
+        for route in state.routes:
+            if route.id == route_id:
+                return route
+        return None
+
+    def _highlight_route_for_order(self, state: GameState, order: Order) -> None:
+        candidates = routes_for_order(state, order)
+        if not candidates:
+            self._selected_route_id = None
+            return
+        current = self._selected_route(state)
+        if current in candidates:
+            return
+        self._selected_route_id = candidates[0].id
+
     def _commands_from_click(
         self,
         event: WindowEvent,
@@ -180,6 +209,7 @@ class Ui:
                 state,
                 self._selected_rover(state),
                 self._selected_order(state),
+                self._selected_route(state),
             ):
                 continue
             return self._commands_from_button(button, state)
@@ -193,9 +223,17 @@ class Ui:
         command = button.command
         if isinstance(command, SelectOrder):
             self._selected_order_id = command.order_id
+            order = self._selected_order(state)
+            if order is None:
+                self._selected_route_id = None
+            else:
+                self._highlight_route_for_order(state, order)
             return []
         if isinstance(command, SelectRover):
             self._selected_rover_id = command.rover_id
+            return []
+        if isinstance(command, SelectRoute):
+            self._selected_route_id = command.route_id
             return []
         if isinstance(command, Confirm):
             return self._send_command(state)
@@ -213,9 +251,10 @@ class Ui:
     def _send_command(self, state: GameState) -> list[PlayerCommand]:
         rover = self._selected_rover(state)
         order = self._selected_order(state)
-        if rover is None or order is None:
+        route = self._selected_route(state)
+        if rover is None or order is None or route is None:
             return []
-        return [StartDelivery(rover, order)]
+        return [StartDelivery(rover, order, route)]
 
     def _toggle_assign(self) -> list[PlayerCommand]:
         if self._open_panel is OpenPanel.ASSIGNMENT:
@@ -233,8 +272,12 @@ class Ui:
 
     def _draw_map(self, state: GameState) -> None:
         self._screen.blit(self._image(state.map.image_key), (0, 0))
+        highlighted = self._selected_route(state)
         for route in state.routes:
-            self._draw_route(route)
+            if route is not highlighted:
+                self._draw_route(route, highlighted=False)
+        if highlighted is not None:
+            self._draw_route(highlighted, highlighted=True)
         for endpoint in state.endpoints:
             self._draw_endpoint(endpoint)
         self._draw_marker(
@@ -244,9 +287,11 @@ class Ui:
             above=False,
         )
 
-    def _draw_route(self, route: Route) -> None:
+    def _draw_route(self, route: Route, *, highlighted: bool) -> None:
         points = [point.to_int_tuple() for point in route.waypoints]
-        pygame.draw.lines(self._screen, ROUTE_COLOR, False, points, 3)
+        color = ROUTE_HIGHLIGHT if highlighted else ROUTE_COLOR
+        width = 5 if highlighted else 3
+        pygame.draw.lines(self._screen, color, False, points, width)
 
     def _draw_endpoint(self, endpoint: Endpoint) -> None:
         self._draw_marker(
@@ -290,6 +335,7 @@ class Ui:
             state,
             self._selected_rover(state),
             self._selected_order(state),
+            self._selected_route(state),
         )
         if reason:
             text = self._font.render(reason, True, REASON_COLOR)
@@ -299,6 +345,17 @@ class Ui:
                 card = rover_card_rect(panel, len(state.orders), 0, rover_count)
                 reason_x = card.x
                 reason_y = card.bottom + 12
+            order = self._selected_order(state)
+            routes = routes_for_order(state, order) if order is not None else []
+            if routes:
+                row = route_button_rect(
+                    panel,
+                    len(state.orders),
+                    rover_count,
+                    0,
+                    len(routes),
+                )
+                reason_y = row.bottom + 12
             self._screen.blit(text, (reason_x, reason_y))
 
     def _draw_shop(self, state: GameState) -> None:
@@ -450,6 +507,7 @@ class Ui:
             state,
             WINDOW_SIZE,
             open_panel=self._open_panel,
+            selected_order=self._selected_order(state),
         ):
             if isinstance(button.command, SelectRover):
                 continue
@@ -458,11 +516,13 @@ class Ui:
                 state,
                 self._selected_rover(state),
                 self._selected_order(state),
+                self._selected_route(state),
             )
             selected = button_selected(
                 button,
                 self._selected_order_id,
                 self._selected_rover_id,
+                self._selected_route_id,
                 self._open_panel,
             )
             if selected:

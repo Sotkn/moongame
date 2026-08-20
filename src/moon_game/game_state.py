@@ -5,7 +5,7 @@ from __future__ import annotations
 from dataclasses import dataclass, field
 from enum import Enum
 
-from moon_game.assignment import can_assign, route_for_order
+from moon_game.assignment import can_assign
 from moon_game.entities import (
     ChooseDelivery,
     Delivery,
@@ -64,13 +64,8 @@ class GameState:
                 return order
         return None
 
-    def start_delivery(self, rover: Rover, order: Order) -> None:
-        if rover not in self.rovers or order not in self.orders:
-            return
-        if not can_assign(self, rover, order).allowed:
-            return
-        route = route_for_order(self, order)
-        if route is None:
+    def start_delivery(self, rover: Rover, order: Order, route: Route) -> None:
+        if not can_assign(self, rover, order, route).allowed:
             return
         rover.status = RoverStatus.EN_ROUTE
         order.status = OrderStatus.IN_PROGRESS

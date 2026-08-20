@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 
-from moon_game.entities import ChooseDelivery, Order, Rover, ShopOffer
+from moon_game.entities import ChooseDelivery, Order, Route, Rover, ShopOffer
 from moon_game.game_state import GamePhase, GameState, prepare_next_day
 
 
@@ -10,12 +10,13 @@ from moon_game.game_state import GamePhase, GameState, prepare_next_day
 class StartDelivery:
     rover: Rover
     order: Order
+    route: Route
 
     def apply(self, state: GameState) -> None:
         if state.phase not in (GamePhase.DAY_START, GamePhase.RUNNING):
             return
         before = len(state.deliveries)
-        state.start_delivery(self.rover, self.order)
+        state.start_delivery(self.rover, self.order, self.route)
         if len(state.deliveries) == before:
             return
         if isinstance(state.pending_event, ChooseDelivery):

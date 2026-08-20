@@ -24,7 +24,12 @@ class AssignResult:
     reason: str = ""
 
 
-def can_assign(state: GameState, rover: Rover, order: Order) -> AssignResult:
+def can_assign(
+    state: GameState,
+    rover: Rover,
+    order: Order,
+    route: Route,
+) -> AssignResult:
     if rover not in state.rovers:
         return AssignResult(False, "Rover is not available")
     if order not in state.orders:
@@ -35,21 +40,21 @@ def can_assign(state: GameState, rover: Rover, order: Order) -> AssignResult:
         return AssignResult(False, "Rover is not at base")
     if order.status is not OrderStatus.AVAILABLE:
         return AssignResult(False, "Order is not available")
-    route = route_for_order(state, order)
-    if route is None:
-        return AssignResult(False, "No route to that destination")
     if order.weight > rover.capacity:
         return AssignResult(False, "Too heavy")
+    if not routes_for_order(state, order):
+        return AssignResult(False, "No route to that destination")
+    if route not in state.routes:
+        return AssignResult(False, "Route is not available")
+    if route.endpoint != order.endpoint:
+        return AssignResult(False, "Route is not for that destination")
     if rover.battery < energy_cost(route, order):
         return AssignResult(False, "Not enough battery")
     return AssignResult(True)
 
 
-def route_for_order(state: GameState, order: Order) -> Route | None:
-    for route in state.routes:
-        if route.endpoint == order.endpoint:
-            return route
-    return None
+def routes_for_order(state: GameState, order: Order) -> list[Route]:
+    return [route for route in state.routes if route.endpoint == order.endpoint]
 
 
 def energy_cost(route: Route, order: Order) -> float:

@@ -19,6 +19,11 @@ class SelectRover:
 
 
 @dataclass(frozen=True)
+class SelectRoute:
+    route_id: str
+
+
+@dataclass(frozen=True)
 class Confirm:
     pass
 

@@ -1,15 +1,22 @@
 from moon_game.entities import Order
-from moon_game.world.endpoints import CRATER, OUTPOST, RIDGE
+from moon_game.world.endpoints import CRATER, RIDGE
 
 
 def build_orders() -> list[Order]:
     return [
         Order(
-            id="parts",
-            name="Parts",
-            endpoint=OUTPOST,
+            id="mail",
+            name="Mail",
+            endpoint=RIDGE,
             weight=3,
             reward=50,
+        ),
+        Order(
+            id="tools",
+            name="Tools",
+            endpoint=RIDGE,
+            weight=8,
+            reward=80,
         ),
         Order(
             id="samples",

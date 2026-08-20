@@ -15,10 +15,19 @@ def build_rovers(play_map: Map) -> list[Rover]:
         Rover(
             id="runner",
             position=play_map.base,
-            speed=140.0,
+            speed=160.0,
             image_key="rover",
             capacity=4,
-            battery=90.0,
-            battery_max=90.0,
+            battery=95.0,
+            battery_max=95.0,
+        ),
+        Rover(
+            id="scout",
+            position=play_map.base,
+            speed=120.0,
+            image_key="rover",
+            capacity=6,
+            battery=120.0,
+            battery_max=120.0,
         ),
     ]

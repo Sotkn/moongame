@@ -79,6 +79,7 @@ class Order:
 @dataclass(frozen=True)
 class Route:
     id: str
+    name: str
     endpoint: Endpoint
     waypoints: tuple[Vec2, ...]
     length: float
@@ -88,13 +89,20 @@ class Route:
         waypoints: tuple[Vec2, ...],
         *,
         id: str,
+        name: str,
         endpoint: Endpoint,
     ) -> Route:
         path = (*waypoints, endpoint.position)
         length = 0.0
         for start, end in pairwise(path):
             length += start.distance_to(end)
-        return Route(id=id, endpoint=endpoint, waypoints=path, length=length)
+        return Route(
+            id=id,
+            name=name,
+            endpoint=endpoint,
+            waypoints=path,
+            length=length,
+        )
 
     @property
     def start(self) -> Vec2:

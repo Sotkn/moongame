@@ -4,15 +4,16 @@ from dataclasses import dataclass
 
 import pygame
 
-from moon_game.assignment import can_assign
+from moon_game.assignment import can_assign, routes_for_order
 from moon_game.commands import BuyRover, EndDay, NextDay, Pause, StartDay
-from moon_game.entities import Order, Rover, ShopOffer
+from moon_game.entities import Order, Route, Rover, ShopOffer
 from moon_game.game_state import GamePhase, GameState
 from moon_game.purchase import can_buy
 from moon_game.ui.commands import (
     Confirm,
     OpenPanel,
     SelectOrder,
+    SelectRoute,
     SelectRover,
     ToggleAssign,
     ToggleShop,
@@ -34,10 +35,14 @@ HUD_BUTTON_Y = 8
 SHOP_HEADING_HEIGHT = 22
 SHOP_COMPACT_ROW = 28
 SHOP_SECTION_GAP = 12
+SHOP_ROW_GAP = 4
+ROUTE_ROW_HEIGHT = 36
+ROUTE_ROW_GAP = 12
 
 type ButtonCommand = (
     SelectOrder
     | SelectRover
+    | SelectRoute
     | Confirm
     | Pause
     | StartDay
@@ -62,12 +67,13 @@ def build_buttons(
     window_size: tuple[int, int],
     *,
     open_panel: OpenPanel,
+    selected_order: Order | None = None,
 ) -> list[Button]:
     if state.phase is GamePhase.DAY_END:
         return [_next_day_button(window_size)]
     buttons = _hud_buttons(state, window_size)
     if open_panel is OpenPanel.ASSIGNMENT:
-        buttons.extend(_assignment_buttons(state, window_size))
+        buttons.extend(_assignment_buttons(state, window_size, selected_order))
     elif open_panel is OpenPanel.SHOP:
         buttons.extend(_shop_buttons(state, window_size))
     return buttons
@@ -78,10 +84,11 @@ def button_enabled(
     state: GameState,
     selected_rover: Rover | None,
     selected_order: Order | None,
+    selected_route: Route | None,
 ) -> bool:
     command = button.command
     if isinstance(command, Confirm):
-        return _send_enabled(state, selected_rover, selected_order)
+        return _send_enabled(state, selected_rover, selected_order, selected_route)
     if isinstance(command, StartDay):
         return state.phase is GamePhase.DAY_START
     if isinstance(command, NextDay):
@@ -92,7 +99,7 @@ def button_enabled(
         return state.phase in (GamePhase.DAY_START, GamePhase.RUNNING)
     return isinstance(
         command,
-        (SelectOrder, SelectRover, Pause, ToggleAssign, ToggleShop),
+        (SelectOrder, SelectRover, SelectRoute, Pause, ToggleAssign, ToggleShop),
     )
 
 
@@ -100,12 +107,15 @@ def button_selected(
     button: Button,
     selected_order_id: str | None,
     selected_rover_id: str | None,
+    selected_route_id: str | None,
     open_panel: OpenPanel,
 ) -> bool:
     if isinstance(button.command, SelectOrder):
         return button.command.order_id == selected_order_id
     if isinstance(button.command, SelectRover):
         return button.command.rover_id == selected_rover_id
+    if isinstance(button.command, SelectRoute):
+        return button.command.route_id == selected_route_id
     if isinstance(button.command, ToggleAssign):
         return open_panel is OpenPanel.ASSIGNMENT
     if isinstance(button.command, ToggleShop):
@@ -123,12 +133,15 @@ def overlay_reason(
     state: GameState,
     selected_rover: Rover | None,
     selected_order: Order | None,
+    selected_route: Route | None,
 ) -> str:
     if selected_rover is None:
         return "Select a rover"
     if selected_order is None:
         return "Select an order"
-    result = can_assign(state, selected_rover, selected_order)
+    if selected_route is None:
+        return "Select a route"
+    result = can_assign(state, selected_rover, selected_order, selected_route)
     if result.allowed:
         return ""
     return result.reason
@@ -169,7 +182,7 @@ def shop_park_row_rect(
     index: int,
 ) -> pygame.Rect:
     y = shop_park_heading_y(overlay, offer_count) + SHOP_HEADING_HEIGHT
-    y += index * (SHOP_COMPACT_ROW + ROW_GAP)
+    y += index * (SHOP_COMPACT_ROW + SHOP_ROW_GAP)
     return pygame.Rect(
         overlay.x + OVERLAY_PAD,
         y,
@@ -195,7 +208,7 @@ def shop_job_row_rect(
     index: int,
 ) -> pygame.Rect:
     y = shop_jobs_heading_y(overlay, offer_count, rover_count) + SHOP_HEADING_HEIGHT
-    y += index * (SHOP_COMPACT_ROW + ROW_GAP)
+    y += index * (SHOP_COMPACT_ROW + SHOP_ROW_GAP)
     return pygame.Rect(
         overlay.x + OVERLAY_PAD,
         y,
@@ -217,6 +230,22 @@ def rover_card_rect(
     width = (inner_width - gap * (count - 1)) // count
     x = overlay.x + OVERLAY_PAD + index * (width + gap)
     return pygame.Rect(x, y, width, ROVER_CARD_HEIGHT)
+
+
+def route_button_rect(
+    overlay: pygame.Rect,
+    order_count: int,
+    rover_count: int,
+    index: int,
+    route_count: int,
+) -> pygame.Rect:
+    y = rover_card_rect(overlay, order_count, 0, rover_count).bottom + ROUTE_ROW_GAP
+    inner_width = overlay.width - 2 * OVERLAY_PAD
+    count = max(1, route_count)
+    gap = ROVER_CARD_INNER_GAP if count > 1 else 0
+    width = (inner_width - gap * (count - 1)) // count
+    x = overlay.x + OVERLAY_PAD + index * (width + gap)
+    return pygame.Rect(x, y, width, ROUTE_ROW_HEIGHT)
 
 
 def _hud_buttons(
@@ -252,10 +281,12 @@ def _hud_buttons(
 def _assignment_buttons(
     state: GameState,
     window_size: tuple[int, int],
+    selected_order: Order | None,
 ) -> list[Button]:
     overlay = overlay_rect(window_size)
     buttons = _order_rows(state, overlay)
     buttons.extend(_rover_cards(state, overlay))
+    buttons.extend(_route_buttons(state, overlay, selected_order))
     close_index = 2 if state.phase is GamePhase.DAY_START else 1
     buttons.append(_close_button(overlay, close_index, ToggleAssign()))
     if state.phase is GamePhase.DAY_START:
@@ -322,6 +353,35 @@ def _rover_cards(state: GameState, overlay: pygame.Rect) -> list[Button]:
     return buttons
 
 
+def _route_buttons(
+    state: GameState,
+    overlay: pygame.Rect,
+    selected_order: Order | None,
+) -> list[Button]:
+    if selected_order is None:
+        return []
+    routes = routes_for_order(state, selected_order)
+    rover_count = len(state.rovers)
+    order_count = len(state.orders)
+    buttons: list[Button] = []
+    for index, route in enumerate(routes):
+        buttons.append(
+            Button(
+                id=f"route-{route.id}",
+                rect=route_button_rect(
+                    overlay,
+                    order_count,
+                    rover_count,
+                    index,
+                    len(routes),
+                ),
+                label=_route_label(route),
+                command=SelectRoute(route.id),
+            )
+        )
+    return buttons
+
+
 def _send_button(overlay: pygame.Rect) -> Button:
     return Button(
         id="send",
@@ -367,12 +427,13 @@ def _send_enabled(
     state: GameState,
     selected_rover: Rover | None,
     selected_order: Order | None,
+    selected_route: Route | None,
 ) -> bool:
     if state.phase not in (GamePhase.DAY_START, GamePhase.RUNNING):
         return False
-    if selected_rover is None or selected_order is None:
+    if selected_rover is None or selected_order is None or selected_route is None:
         return False
-    return can_assign(state, selected_rover, selected_order).allowed
+    return can_assign(state, selected_rover, selected_order, selected_route).allowed
 
 
 def _buy_enabled(state: GameState, offer: ShopOffer) -> bool:
@@ -424,3 +485,7 @@ def _order_label(order: Order) -> str:
         f"{order.name}  {order.endpoint.name}  "
         f"wt {order.weight}  ${order.reward}  {order.status.value}"
     )
+
+
+def _route_label(route: Route) -> str:
+    return f"{route.name}  {route.length:.0f}"
