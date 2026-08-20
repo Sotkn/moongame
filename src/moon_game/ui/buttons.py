@@ -313,7 +313,7 @@ def _order_rows(state: GameState, overlay: pygame.Rect) -> list[Button]:
             Button(
                 id=f"order-{order.id}",
                 rect=_content_row_rect(overlay, index, ROW_HEIGHT, ROW_GAP),
-                label=_order_label(order),
+                label=_order_label(order, state.day_elapsed),
                 command=SelectOrder(order.id),
             )
         )
@@ -481,10 +481,12 @@ def _rows_bottom(
     return _content_row_rect(overlay, count - 1, height, gap).bottom
 
 
-def _order_label(order: Order) -> str:
+def _order_label(order: Order, day_elapsed: float) -> str:
+    remaining = max(0.0, order.deadline - day_elapsed)
     return (
         f"{order.name}  {order.endpoint.name}  "
-        f"wt {order.weight}  ${order.reward}  {order.status.value}"
+        f"wt {order.weight}  ${order.reward}  "
+        f"due {remaining:.0f}s  {order.status.value}"
     )
 
 

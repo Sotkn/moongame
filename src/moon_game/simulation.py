@@ -54,6 +54,7 @@ class Simulation:
         if state.day_elapsed >= state.day_length:
             state.abort_active_trips()
             return [DayEnded()]
+        state.expire_deadlines()
         events: list[SimEvent] = []
         for delivery in state.deliveries:
             if delivery.state is DeliveryState.ACTIVE:

@@ -91,10 +91,29 @@ class GameState:
 
     def abort_active_trips(self) -> None:
         for delivery in self.deliveries:
+            self.abort_delivery(delivery)
+
+    def expire_deadlines(self) -> None:
+        for order in self.orders:
+            if (
+                order.status is OrderStatus.AVAILABLE
+                and self.day_elapsed >= order.deadline
+            ):
+                order.status = OrderStatus.FAILED
+        for delivery in self.deliveries:
             if delivery.state is not DeliveryState.ACTIVE:
                 continue
-            delivery.rover.status = RoverStatus.IDLE
-            delivery.rover.position = self.map.base
+            if self.day_elapsed < delivery.order.deadline:
+                continue
+            self.abort_delivery(delivery)
+            delivery.order.status = OrderStatus.FAILED
+
+    def abort_delivery(self, delivery: Delivery) -> None:
+        if delivery.state is not DeliveryState.ACTIVE:
+            return
+        delivery.state = DeliveryState.ABORTED
+        delivery.rover.status = RoverStatus.IDLE
+        delivery.rover.position = self.map.base
 
     def start_next_day(self, orders: list[Order]) -> None:
         self.day_number += 1

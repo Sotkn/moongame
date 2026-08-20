@@ -454,6 +454,12 @@ class Ui:
             "Completed",
             [order for order in state.orders if order.status is OrderStatus.COMPLETED],
         )
+        y = self._draw_order_group(
+            panel,
+            y + 16,
+            "Failed",
+            [order for order in state.orders if order.status is OrderStatus.FAILED],
+        )
         self._draw_order_group(
             panel,
             y + 16,
@@ -461,7 +467,7 @@ class Ui:
             [
                 order
                 for order in state.orders
-                if order.status is not OrderStatus.COMPLETED
+                if order.status not in (OrderStatus.COMPLETED, OrderStatus.FAILED)
             ],
         )
 

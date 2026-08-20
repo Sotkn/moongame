@@ -1,4 +1,5 @@
 from moon_game.entities import Order
+from moon_game.world.day import DAY_LENGTH
 from moon_game.world.endpoints import CRATER, RIDGE
 
 
@@ -10,6 +11,7 @@ def build_orders() -> list[Order]:
             endpoint=RIDGE,
             weight=3,
             reward=50,
+            deadline=13.0,
         ),
         Order(
             id="tools",
@@ -17,6 +19,7 @@ def build_orders() -> list[Order]:
             endpoint=RIDGE,
             weight=8,
             reward=80,
+            deadline=DAY_LENGTH,
         ),
         Order(
             id="samples",
@@ -24,6 +27,7 @@ def build_orders() -> list[Order]:
             endpoint=CRATER,
             weight=6,
             reward=80,
+            deadline=DAY_LENGTH,
         ),
         Order(
             id="ore",
@@ -31,5 +35,6 @@ def build_orders() -> list[Order]:
             endpoint=RIDGE,
             weight=20,
             reward=200,
+            deadline=DAY_LENGTH,
         ),
     ]

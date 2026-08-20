@@ -50,6 +50,8 @@ def can_assign(
         return AssignResult(False, "Route is not for that destination")
     if rover.battery < energy_cost(route, order):
         return AssignResult(False, "Not enough battery")
+    if state.day_elapsed + trip_time(route, rover) > order.deadline:
+        return AssignResult(False, "Would miss deadline")
     return AssignResult(True)
 
 
@@ -59,3 +61,9 @@ def routes_for_order(state: GameState, order: Order) -> list[Route]:
 
 def energy_cost(route: Route, order: Order) -> float:
     return 2 * route.length * ENERGY_PER_LENGTH + order.weight * ENERGY_PER_WEIGHT
+
+
+def trip_time(route: Route, rover: Rover) -> float:
+    if route.length == 0.0:
+        return 0.0
+    return 2 * route.length / rover.speed

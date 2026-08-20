@@ -21,12 +21,14 @@ class DeliveryDirection(Enum):
 class DeliveryState(Enum):
     ACTIVE = "active"
     COMPLETED = "completed"
+    ABORTED = "aborted"
 
 
 class OrderStatus(Enum):
     AVAILABLE = "available"
     IN_PROGRESS = "in_progress"
     COMPLETED = "completed"
+    FAILED = "failed"
 
 
 @dataclass(frozen=True)
@@ -73,6 +75,7 @@ class Order:
     endpoint: Endpoint
     weight: int
     reward: int
+    deadline: float
     status: OrderStatus = OrderStatus.AVAILABLE
 
 
