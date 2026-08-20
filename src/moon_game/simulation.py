@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from moon_game.assignment import energy_cost
 from moon_game.entities import (
+    ChooseDelivery,
     Delivery,
     DeliveryDirection,
     DeliveryState,
@@ -49,8 +50,8 @@ class Simulation:
         delivery.rover.position = delivery.route.start
         delivery.rover.battery = max(0.0, delivery.rover.battery)
         state.money += delivery.order.reward
-        if not any(item.state is DeliveryState.ACTIVE for item in state.deliveries):
-            state.paused = True
+        if any(order.status is OrderStatus.AVAILABLE for order in state.orders):
+            state.pending_event = ChooseDelivery(rover=delivery.rover)
 
     def _spend_battery(self, delivery: Delivery, leg_progress: float) -> None:
         cost = energy_cost(delivery.route, delivery.order)

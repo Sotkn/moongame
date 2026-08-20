@@ -5,17 +5,24 @@ from dataclasses import dataclass
 import pygame
 
 from moon_game.assignment import can_assign
-from moon_game.entities import Order, Rover
-from moon_game.game_state import GameState
-from moon_game.ui.commands import Confirm, Pause, SelectOrder, SelectRover
+from moon_game.entities import ChooseDelivery, Order
+from moon_game.game_state import GamePhase, GameState
+from moon_game.ui.commands import Confirm, DismissChoice, Pause, SelectOrder
 
-CONTROL_ORIGIN = (16, 488)
-BUTTON_SIZE = (112, 36)
+OVERLAY_SIZE = (700, 440)
+OVERLAY_PAD = 24
+TITLE_HEIGHT = 32
+ROW_HEIGHT = 40
+ROW_GAP = 8
+ROVER_CARD_GAP = 16
+ROVER_CARD_HEIGHT = 72
+BUTTON_SIZE = (140, 40)
 BUTTON_GAP = 8
 PAUSE_SIZE = (112, 36)
 PAUSE_MARGIN = 16
+PAUSE_Y = 488
 
-type ButtonCommand = SelectOrder | SelectRover | Confirm | Pause
+type ButtonCommand = SelectOrder | Confirm | DismissChoice | Pause
 
 
 @dataclass
@@ -30,107 +37,118 @@ def build_buttons(
     state: GameState,
     window_size: tuple[int, int],
 ) -> list[Button]:
-    buttons = _order_buttons(state)
-    buttons.extend(_rover_buttons(state, len(buttons)))
-    buttons.append(_confirm_button(len(buttons)))
-    buttons.append(_pause_button(state, window_size))
-    return buttons
+    if state.overlay_open():
+        return _overlay_buttons(state, window_size)
+    return [_pause_button(state, window_size)]
 
 
 def button_enabled(
     button: Button,
     state: GameState,
     selected_order: Order | None,
-    selected_rover: Rover | None,
 ) -> bool:
     if isinstance(button.command, Confirm):
-        return _confirm_enabled(state, selected_order, selected_rover)
-    if isinstance(button.command, Pause):
-        return True
-    return isinstance(button.command, (SelectOrder, SelectRover))
+        return _commit_enabled(state, selected_order)
+    return isinstance(
+        button.command,
+        (SelectOrder, DismissChoice, Pause),
+    )
 
 
-def button_selected(
-    button: Button,
-    selected_order: Order | None,
-    selected_rover: Rover | None,
-) -> bool:
+def button_selected(button: Button, selected_order: Order | None) -> bool:
     if isinstance(button.command, SelectOrder):
         return button.command.order is selected_order
-    if isinstance(button.command, SelectRover):
-        return button.command.rover is selected_rover
     return False
 
 
-def confirm_reason(
-    state: GameState,
-    selected_order: Order | None,
-    selected_rover: Rover | None,
-) -> str:
-    if not state.paused:
-        return "Pause to assign"
-    if selected_order is None or selected_rover is None:
-        return "Select an order and a rover"
-    result = can_assign(state, selected_rover, selected_order)
+def overlay_title(state: GameState) -> str:
+    if state.phase is GamePhase.DAY_START:
+        return "Day start"
+    return "Choose delivery"
+
+
+def overlay_reason(state: GameState, selected_order: Order | None) -> str:
+    if selected_order is None:
+        return "Select an order"
+    result = can_assign(state, state.day_rover(), selected_order)
     if result.allowed:
         return ""
     return result.reason
 
 
-def _confirm_enabled(
+def overlay_rect(window_size: tuple[int, int]) -> pygame.Rect:
+    width, height = OVERLAY_SIZE
+    return pygame.Rect(
+        (window_size[0] - width) // 2,
+        (window_size[1] - height) // 2,
+        width,
+        height,
+    )
+
+
+def rover_card_rect(overlay: pygame.Rect, order_count: int) -> pygame.Rect:
+    y = _rows_bottom(overlay, order_count) + ROVER_CARD_GAP
+    return pygame.Rect(
+        overlay.x + OVERLAY_PAD,
+        y,
+        overlay.width - 2 * OVERLAY_PAD,
+        ROVER_CARD_HEIGHT,
+    )
+
+
+def _overlay_buttons(
     state: GameState,
-    selected_order: Order | None,
-    selected_rover: Rover | None,
-) -> bool:
-    if not state.paused or selected_order is None or selected_rover is None:
-        return False
-    return can_assign(state, selected_rover, selected_order).allowed
+    window_size: tuple[int, int],
+) -> list[Button]:
+    overlay = overlay_rect(window_size)
+    buttons = _order_rows(state, overlay)
+    buttons.append(_commit_button(state, overlay))
+    if isinstance(state.pending_event, ChooseDelivery):
+        buttons.append(_done_button(overlay))
+    return buttons
 
 
-def _order_buttons(state: GameState) -> list[Button]:
+def _order_rows(state: GameState, overlay: pygame.Rect) -> list[Button]:
     buttons: list[Button] = []
-    x, y = CONTROL_ORIGIN
-    width, height = BUTTON_SIZE
-    for order in state.orders:
+    for index, order in enumerate(state.orders):
         buttons.append(
             Button(
                 id=f"order-{order.id}",
-                rect=pygame.Rect(x, y, width, height),
-                label=order.name,
+                rect=_order_row_rect(overlay, index),
+                label=_order_label(order),
                 command=SelectOrder(order),
             )
         )
-        x += width + BUTTON_GAP
     return buttons
 
 
-def _rover_buttons(state: GameState, index: int) -> list[Button]:
-    buttons: list[Button] = []
-    x, y = CONTROL_ORIGIN
+def _commit_button(state: GameState, overlay: pygame.Rect) -> Button:
     width, height = BUTTON_SIZE
-    x += index * (width + BUTTON_GAP)
-    for rover in state.rovers:
-        buttons.append(
-            Button(
-                id=f"rover-{rover.id}",
-                rect=pygame.Rect(x, y, width, height),
-                label=rover.id,
-                command=SelectRover(rover),
-            )
-        )
-        x += width + BUTTON_GAP
-    return buttons
-
-
-def _confirm_button(index: int) -> Button:
-    x, y = CONTROL_ORIGIN
-    width, height = BUTTON_SIZE
-    x += index * (width + BUTTON_GAP)
     return Button(
-        id="confirm",
-        rect=pygame.Rect(x, y, width, height),
-        label="Confirm",
+        id="commit",
+        rect=pygame.Rect(
+            overlay.right - OVERLAY_PAD - width,
+            overlay.bottom - OVERLAY_PAD - height,
+            width,
+            height,
+        ),
+        label="Start day" if state.phase is GamePhase.DAY_START else "Send",
         command=Confirm(),
+    )
+
+
+def _done_button(overlay: pygame.Rect) -> Button:
+    width, height = BUTTON_SIZE
+    return Button(
+        id="done",
+        rect=pygame.Rect(
+            overlay.right - OVERLAY_PAD - 2 * width - BUTTON_GAP,
+            overlay.bottom - OVERLAY_PAD - height,
+            width,
+            height,
+        ),
+        label="Done",
+        command=DismissChoice(),
     )
 
 
@@ -140,10 +158,39 @@ def _pause_button(state: GameState, window_size: tuple[int, int]) -> Button:
         id="pause",
         rect=pygame.Rect(
             window_size[0] - PAUSE_MARGIN - width,
-            CONTROL_ORIGIN[1],
+            PAUSE_Y,
             width,
             height,
         ),
         label="Resume" if state.paused else "Pause",
         command=Pause(),
+    )
+
+
+def _commit_enabled(state: GameState, selected_order: Order | None) -> bool:
+    if selected_order is None:
+        return False
+    return can_assign(state, state.day_rover(), selected_order).allowed
+
+
+def _order_row_rect(overlay: pygame.Rect, index: int) -> pygame.Rect:
+    y = overlay.y + OVERLAY_PAD + TITLE_HEIGHT + index * (ROW_HEIGHT + ROW_GAP)
+    return pygame.Rect(
+        overlay.x + OVERLAY_PAD,
+        y,
+        overlay.width - 2 * OVERLAY_PAD,
+        ROW_HEIGHT,
+    )
+
+
+def _rows_bottom(overlay: pygame.Rect, order_count: int) -> int:
+    if order_count <= 0:
+        return overlay.y + OVERLAY_PAD + TITLE_HEIGHT
+    return _order_row_rect(overlay, order_count - 1).bottom
+
+
+def _order_label(order: Order) -> str:
+    return (
+        f"{order.name}  {order.endpoint.name}  "
+        f"wt {order.weight}  ${order.reward}  {order.status.value}"
     )

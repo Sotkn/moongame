@@ -1,5 +1,5 @@
 from moon_game.entities import Order
-from moon_game.world.endpoints import OUTPOST, RIDGE
+from moon_game.world.endpoints import CRATER, OUTPOST, RIDGE
 
 
 def build_orders() -> list[Order]:
@@ -12,10 +12,17 @@ def build_orders() -> list[Order]:
             reward=50,
         ),
         Order(
+            id="samples",
+            name="Samples",
+            endpoint=CRATER,
+            weight=4,
+            reward=80,
+        ),
+        Order(
             id="ore",
             name="Ore",
             endpoint=RIDGE,
-            weight=12,
-            reward=120,
+            weight=20,
+            reward=200,
         ),
     ]

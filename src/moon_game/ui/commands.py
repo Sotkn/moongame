@@ -9,11 +9,6 @@ class SelectOrder:
 
 
 @dataclass(frozen=True)
-class SelectRover:
-    rover: Rover
-
-
-@dataclass(frozen=True)
 class Confirm:
     pass
 
@@ -25,8 +20,13 @@ class StartDelivery:
 
 
 @dataclass(frozen=True)
+class DismissChoice:
+    pass
+
+
+@dataclass(frozen=True)
 class Pause:
     pass
 
 
-type PlayerCommand = StartDelivery | Pause
+type PlayerCommand = StartDelivery | DismissChoice | Pause

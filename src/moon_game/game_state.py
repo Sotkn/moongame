@@ -5,6 +5,7 @@ from enum import Enum
 
 from moon_game.assignment import can_assign, route_for_order
 from moon_game.entities import (
+    ChooseDelivery,
     Delivery,
     Endpoint,
     Map,
@@ -22,7 +23,7 @@ from moon_game.world.rovers import build_rovers
 
 
 class GamePhase(Enum):
-    PREP = "prep"
+    DAY_START = "day_start"
     RUNNING = "running"
 
 
@@ -35,8 +36,18 @@ class GameState:
     orders: list[Order]
     deliveries: list[Delivery] = field(default_factory=list)
     money: int = 0
-    phase: GamePhase = GamePhase.PREP
+    phase: GamePhase = GamePhase.DAY_START
+    pending_event: ChooseDelivery | None = None
     paused: bool = True
+
+    def overlay_open(self) -> bool:
+        return self.phase is GamePhase.DAY_START or self.pending_event is not None
+
+    def day_rover(self) -> Rover:
+        event = self.pending_event
+        if isinstance(event, ChooseDelivery):
+            return event.rover
+        return self.rovers[0]
 
     def start_delivery(self, rover: Rover, order: Order) -> None:
         if rover not in self.rovers or order not in self.orders:
@@ -52,8 +63,6 @@ class GameState:
 
     def toggle_pause(self) -> None:
         self.paused = not self.paused
-        if not self.paused:
-            self.phase = GamePhase.RUNNING
 
 
 def load_state() -> GameState:

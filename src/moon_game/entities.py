@@ -114,3 +114,8 @@ class Delivery:
     progress: float = 0.0
     direction: DeliveryDirection = DeliveryDirection.TO_DESTINATION
     state: DeliveryState = DeliveryState.ACTIVE
+
+
+@dataclass(frozen=True)
+class ChooseDelivery:
+    rover: Rover

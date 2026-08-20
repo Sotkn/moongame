@@ -12,14 +12,17 @@ from moon_game.ui.buttons import (
     build_buttons,
     button_enabled,
     button_selected,
-    confirm_reason,
+    overlay_reason,
+    overlay_rect,
+    overlay_title,
+    rover_card_rect,
 )
 from moon_game.ui.commands import (
     Confirm,
+    DismissChoice,
     Pause,
     PlayerCommand,
     SelectOrder,
-    SelectRover,
     StartDelivery,
 )
 from moon_game.window_events import WindowEvent, WindowEventKind
@@ -34,6 +37,10 @@ LABEL_COLOR = (168, 174, 186)
 REASON_COLOR = (220, 140, 96)
 BATTERY_BACK = (42, 46, 54)
 BATTERY_FILL = (88, 176, 124)
+OVERLAY_DIM = (8, 10, 16, 150)
+PANEL_BG = (28, 34, 44)
+PANEL_BORDER = (70, 92, 122)
+ROVER_CARD_BG = (36, 42, 52)
 SPRITE_MAX_SIZE = {
     "rover": 48,
     "base": 100,
@@ -49,15 +56,19 @@ class Ui:
         pygame.display.set_caption("Moon Courier Crisis")
         self._screen = pygame.display.set_mode(WINDOW_SIZE)
         self._font = pygame.font.SysFont("segoe ui", 18)
+        self._title_font = pygame.font.SysFont("segoe ui", 22)
         self._images: dict[str, pygame.Surface] = {}
         self._selected_order: Order | None = None
-        self._selected_rover: Rover | None = None
+        self._dim = pygame.Surface(WINDOW_SIZE, pygame.SRCALPHA)
+        self._dim.fill(OVERLAY_DIM)
 
     def read_commands(
         self,
         events: Sequence[WindowEvent],
         state: GameState,
     ) -> list[PlayerCommand]:
+        if not state.overlay_open():
+            self._selected_order = None
         buttons = build_buttons(state, WINDOW_SIZE)
         commands: list[PlayerCommand] = []
         for event in events:
@@ -70,8 +81,10 @@ class Ui:
         self._draw_map(state)
         for rover in state.rovers:
             self._draw_rover(rover)
-        self._draw_buttons(state)
         self._draw_hud(state)
+        if state.overlay_open():
+            self._draw_overlay(state)
+        self._draw_buttons(state)
         pygame.display.flip()
 
     def close(self) -> None:
@@ -88,31 +101,26 @@ class Ui:
         for button in buttons:
             if not button.rect.collidepoint(event.position):
                 continue
-            if not button_enabled(
-                button,
-                state,
-                self._selected_order,
-                self._selected_rover,
-            ):
+            if not button_enabled(button, state, self._selected_order):
                 continue
-            return self._command_from_button(button)
+            return self._command_from_button(button, state)
         return None
 
-    def _command_from_button(self, button: Button) -> PlayerCommand | None:
+    def _command_from_button(
+        self,
+        button: Button,
+        state: GameState,
+    ) -> PlayerCommand | None:
         command = button.command
         if isinstance(command, SelectOrder):
             self._selected_order = command.order
             return None
-        if isinstance(command, SelectRover):
-            self._selected_rover = command.rover
-            return None
         if isinstance(command, Confirm):
             order = self._selected_order
-            rover = self._selected_rover
-            if order is None or rover is None:
+            if order is None:
                 return None
-            return StartDelivery(rover, order)
-        if isinstance(command, Pause):
+            return StartDelivery(state.day_rover(), order)
+        if isinstance(command, (DismissChoice, Pause)):
             return command
         return None
 
@@ -159,19 +167,38 @@ class Ui:
         offset_y = -rect.height // 2 - 14 if above else rect.height // 2 + 14
         self._draw_label(label, origin, (0, offset_y))
 
+    def _draw_overlay(self, state: GameState) -> None:
+        self._screen.blit(self._dim, (0, 0))
+        panel = overlay_rect(WINDOW_SIZE)
+        pygame.draw.rect(self._screen, PANEL_BG, panel, border_radius=10)
+        pygame.draw.rect(self._screen, PANEL_BORDER, panel, width=2, border_radius=10)
+        title = self._title_font.render(overlay_title(state), True, BUTTON_TEXT)
+        self._screen.blit(title, (panel.x + 24, panel.y + 20))
+        money = self._font.render(f"Money  {state.money}", True, LABEL_COLOR)
+        money_rect = money.get_rect(topright=(panel.right - 24, panel.y + 24))
+        self._screen.blit(money, money_rect)
+        card = rover_card_rect(panel, len(state.orders))
+        self._draw_rover_card(state.day_rover(), card)
+        reason = overlay_reason(state, self._selected_order)
+        if reason:
+            text = self._font.render(reason, True, REASON_COLOR)
+            self._screen.blit(text, (card.x, card.bottom + 12))
+
+    def _draw_rover_card(self, rover: Rover, rect: pygame.Rect) -> None:
+        pygame.draw.rect(self._screen, ROVER_CARD_BG, rect, border_radius=8)
+        name = self._font.render(rover.id, True, BUTTON_TEXT)
+        self._screen.blit(name, (rect.x + 16, rect.y + 12))
+        cap = self._font.render(f"cap {rover.capacity}", True, LABEL_COLOR)
+        self._screen.blit(cap, (rect.x + 16, rect.y + 38))
+        self._draw_battery_bar(rect.x + 148, rect.y + 44, rover)
+        battery = f"{rover.battery:.0f}/{rover.battery_max:.0f}"
+        amount = self._font.render(battery, True, LABEL_COLOR)
+        self._screen.blit(amount, (rect.x + 240, rect.y + 38))
+
     def _draw_buttons(self, state: GameState) -> None:
         for button in build_buttons(state, WINDOW_SIZE):
-            enabled = button_enabled(
-                button,
-                state,
-                self._selected_order,
-                self._selected_rover,
-            )
-            selected = button_selected(
-                button,
-                self._selected_order,
-                self._selected_rover,
-            )
+            enabled = button_enabled(button, state, self._selected_order)
+            selected = button_selected(button, self._selected_order)
             if selected:
                 color = BUTTON_SELECTED
             elif enabled:
@@ -180,28 +207,20 @@ class Ui:
                 color = BUTTON_DISABLED
             pygame.draw.rect(self._screen, color, button.rect, border_radius=6)
             label = self._font.render(button.label, True, BUTTON_TEXT)
-            self._screen.blit(label, label.get_rect(center=button.rect.center))
+            if isinstance(button.command, SelectOrder):
+                dest = label.get_rect(midleft=(button.rect.x + 12, button.rect.centery))
+            else:
+                dest = label.get_rect(center=button.rect.center)
+            self._screen.blit(label, dest)
 
     def _draw_hud(self, state: GameState) -> None:
-        y = 16
+        if state.overlay_open():
+            return
         money = self._font.render(f"Money  {state.money}", True, LABEL_COLOR)
-        self._screen.blit(money, (24, y))
-        y += 26
-        order = self._selected_order
-        if order is not None:
-            detail = (
-                f"{order.name}  {order.endpoint.name}  "
-                f"wt {order.weight}  ${order.reward}"
-            )
-            line = self._font.render(detail, True, LABEL_COLOR)
-            self._screen.blit(line, (24, y))
-            y += 26
+        self._screen.blit(money, (24, 16))
+        y = 42
         for rover in state.rovers:
             y = self._draw_rover_stats(rover, 24, y)
-        reason = confirm_reason(state, self._selected_order, self._selected_rover)
-        if reason:
-            text = self._font.render(reason, True, REASON_COLOR)
-            self._screen.blit(text, (24, y + 4))
 
     def _draw_rover_stats(self, rover: Rover, x: int, y: int) -> int:
         label = f"{rover.id}  cap {rover.capacity}"
