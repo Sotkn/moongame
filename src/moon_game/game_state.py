@@ -69,15 +69,21 @@ class GameState:
         order.status = OrderStatus.IN_PROGRESS
         self.deliveries.append(Delivery(rover=rover, order=order, route=route))
 
-    def start_next_day(self) -> None:
+    def start_next_day(self, orders: list[Order]) -> None:
         self.day_number += 1
-        self.orders = build_orders()
-        self.rovers = build_rovers(self.map)
+        self.orders = orders
         self.deliveries = []
         self.day_elapsed = 0.0
         self.phase = GamePhase.DAY_START
         self.paused = True
         self.pending_event = None
+        self._rest_rovers()
+
+    def _rest_rovers(self) -> None:
+        for rover in self.rovers:
+            rover.status = RoverStatus.IDLE
+            rover.position = self.map.base
+            rover.battery = rover.battery_max
 
     def toggle_pause(self) -> None:
         self.paused = not self.paused
@@ -97,3 +103,7 @@ def initial_state() -> GameState:
         orders=build_orders(),
         day_length=DAY_LENGTH,
     )
+
+
+def prepare_next_day(state: GameState) -> None:
+    state.start_next_day(build_orders())

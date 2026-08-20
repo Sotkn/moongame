@@ -3,7 +3,7 @@ from __future__ import annotations
 from dataclasses import dataclass
 
 from moon_game.entities import ChooseDelivery, Order, Rover
-from moon_game.game_state import GamePhase, GameState
+from moon_game.game_state import GamePhase, GameState, prepare_next_day
 
 
 @dataclass(frozen=True)
@@ -51,7 +51,7 @@ class NextDay:
     def apply(self, state: GameState) -> None:
         if state.phase is not GamePhase.DAY_END:
             return
-        state.start_next_day()
+        prepare_next_day(state)
 
 
 type PlayerCommand = StartDelivery | StartDay | DismissChoice | Pause | NextDay
