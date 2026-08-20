@@ -6,7 +6,6 @@ import pygame
 
 from moon_game.asset_catalog import asset_path
 from moon_game.commands import (
-    DismissChoice,
     NextDay,
     Pause,
     PlayerCommand,
@@ -171,9 +170,6 @@ class Ui:
             return self._send_command(state)
         if isinstance(command, ToggleOrders):
             return self._toggle_orders()
-        if isinstance(command, DismissChoice):
-            self._orders_open = False
-            return [command]
         if isinstance(command, (Pause, StartDay, NextDay)):
             return [command]
         return []
@@ -186,10 +182,7 @@ class Ui:
         return [StartDelivery(rover, order)]
 
     def _toggle_orders(self) -> list[PlayerCommand]:
-        if self._orders_open:
-            self._orders_open = False
-            return [DismissChoice()]
-        self._orders_open = True
+        self._orders_open = not self._orders_open
         return []
 
     def _draw_map(self, state: GameState) -> None:

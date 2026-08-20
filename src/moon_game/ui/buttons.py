@@ -5,7 +5,7 @@ from dataclasses import dataclass
 import pygame
 
 from moon_game.assignment import can_assign
-from moon_game.commands import DismissChoice, NextDay, Pause, StartDay
+from moon_game.commands import NextDay, Pause, StartDay
 from moon_game.entities import Order, Rover
 from moon_game.game_state import GamePhase, GameState
 from moon_game.ui.commands import Confirm, SelectOrder, ToggleOrders
@@ -24,7 +24,7 @@ HUD_MARGIN = 16
 HUD_BUTTON_Y = 8
 
 type ButtonCommand = (
-    SelectOrder | Confirm | DismissChoice | Pause | StartDay | NextDay | ToggleOrders
+    SelectOrder | Confirm | Pause | StartDay | NextDay | ToggleOrders
 )
 
 
@@ -65,7 +65,7 @@ def button_enabled(
         return state.phase is GamePhase.DAY_END
     return isinstance(
         command,
-        (SelectOrder, DismissChoice, Pause, ToggleOrders),
+        (SelectOrder, Pause, ToggleOrders),
     )
 
 
@@ -178,7 +178,7 @@ def _close_button(overlay: pygame.Rect, index_from_right: int) -> Button:
         id="close",
         rect=_overlay_action_rect(overlay, index_from_right),
         label="Close",
-        command=DismissChoice(),
+        command=ToggleOrders(),
     )
 
 
