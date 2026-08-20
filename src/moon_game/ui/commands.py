@@ -11,3 +11,8 @@ class SelectOrder:
 @dataclass(frozen=True)
 class Confirm:
     pass
+
+
+@dataclass(frozen=True)
+class ToggleOrders:
+    pass

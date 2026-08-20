@@ -7,13 +7,20 @@ import pygame
 from moon_game.asset_catalog import asset_path
 from moon_game.commands import (
     DismissChoice,
+    NextDay,
     Pause,
     PlayerCommand,
-    ResumeFromChoice,
     StartDay,
     StartDelivery,
 )
-from moon_game.entities import ChooseDelivery, Endpoint, Order, Route, Rover
+from moon_game.entities import (
+    ChooseDelivery,
+    Endpoint,
+    Order,
+    OrderStatus,
+    Route,
+    Rover,
+)
 from moon_game.game_state import GamePhase, GameState
 from moon_game.ui.buttons import (
     Button,
@@ -25,7 +32,7 @@ from moon_game.ui.buttons import (
     overlay_title,
     rover_card_rect,
 )
-from moon_game.ui.commands import Confirm, SelectOrder
+from moon_game.ui.commands import Confirm, SelectOrder, ToggleOrders
 from moon_game.window_events import WindowEvent, WindowEventKind
 
 WINDOW_SIZE = (960, 540)
@@ -60,6 +67,9 @@ class Ui:
         self._title_font = pygame.font.SysFont("segoe ui", 22)
         self._images: dict[str, pygame.Surface] = {}
         self._selected_order: Order | None = None
+        self._orders_open = True
+        self._last_phase: GamePhase | None = None
+        self._last_pending: ChooseDelivery | None = None
         self._dim = pygame.Surface(WINDOW_SIZE, pygame.SRCALPHA)
         self._dim.fill(OVERLAY_DIM)
 
@@ -68,26 +78,44 @@ class Ui:
         events: Sequence[WindowEvent],
         state: GameState,
     ) -> list[PlayerCommand]:
-        if not state.overlay_open():
-            self._selected_order = None
-        buttons = build_buttons(state, WINDOW_SIZE)
+        self._follow_state(state)
+        buttons = build_buttons(
+            state,
+            WINDOW_SIZE,
+            orders_open=self._orders_open,
+        )
         commands: list[PlayerCommand] = []
         for event in events:
             commands.extend(self._commands_from_click(event, buttons, state))
         return commands
 
     def draw(self, state: GameState) -> None:
+        self._follow_state(state)
         self._draw_map(state)
         for rover in state.rovers:
             self._draw_rover(rover)
-        self._draw_hud(state)
-        if state.overlay_open():
+        if state.phase is GamePhase.DAY_END:
+            self._draw_day_end(state)
+        elif self._orders_open:
             self._draw_overlay(state)
+        self._draw_hud(state)
         self._draw_buttons(state)
         pygame.display.flip()
 
     def close(self) -> None:
         pygame.quit()
+
+    def _follow_state(self, state: GameState) -> None:
+        if isinstance(state.pending_event, ChooseDelivery) and not isinstance(
+            self._last_pending, ChooseDelivery
+        ):
+            self._orders_open = True
+        if self._last_phase is GamePhase.DAY_END and state.phase is GamePhase.DAY_START:
+            self._orders_open = True
+        if state.phase is GamePhase.DAY_END:
+            self._orders_open = False
+        self._last_pending = state.pending_event
+        self._last_phase = state.phase
 
     def _commands_from_click(
         self,
@@ -115,21 +143,28 @@ class Ui:
             self._selected_order = command.order
             return []
         if isinstance(command, Confirm):
-            return self._commit_commands(state)
-        if isinstance(command, (DismissChoice, Pause)):
+            return self._send_command(state)
+        if isinstance(command, ToggleOrders):
+            return self._toggle_orders()
+        if isinstance(command, DismissChoice):
+            self._orders_open = False
+            return [command]
+        if isinstance(command, (Pause, StartDay, NextDay)):
             return [command]
         return []
 
-    def _commit_commands(self, state: GameState) -> list[PlayerCommand]:
+    def _send_command(self, state: GameState) -> list[PlayerCommand]:
         order = self._selected_order
         if order is None:
             return []
-        commands: list[PlayerCommand] = [StartDelivery(state.day_rover(), order)]
-        if state.phase is GamePhase.DAY_START:
-            commands.append(StartDay())
-        elif isinstance(state.pending_event, ChooseDelivery):
-            commands.append(ResumeFromChoice())
-        return commands
+        return [StartDelivery(state.day_rover(), order)]
+
+    def _toggle_orders(self) -> list[PlayerCommand]:
+        if self._orders_open:
+            self._orders_open = False
+            return [DismissChoice()]
+        self._orders_open = True
+        return []
 
     def _draw_map(self, state: GameState) -> None:
         self._screen.blit(self._image(state.map.image_key), (0, 0))
@@ -181,15 +216,60 @@ class Ui:
         pygame.draw.rect(self._screen, PANEL_BORDER, panel, width=2, border_radius=10)
         title = self._title_font.render(overlay_title(state), True, BUTTON_TEXT)
         self._screen.blit(title, (panel.x + 24, panel.y + 20))
-        money = self._font.render(f"Money  {state.money}", True, LABEL_COLOR)
-        money_rect = money.get_rect(topright=(panel.right - 24, panel.y + 24))
-        self._screen.blit(money, money_rect)
         card = rover_card_rect(panel, len(state.orders))
         self._draw_rover_card(state.day_rover(), card)
         reason = overlay_reason(state, self._selected_order)
         if reason:
             text = self._font.render(reason, True, REASON_COLOR)
             self._screen.blit(text, (card.x, card.bottom + 12))
+
+    def _draw_day_end(self, state: GameState) -> None:
+        self._screen.blit(self._dim, (0, 0))
+        panel = overlay_rect(WINDOW_SIZE)
+        pygame.draw.rect(self._screen, PANEL_BG, panel, border_radius=10)
+        pygame.draw.rect(self._screen, PANEL_BORDER, panel, width=2, border_radius=10)
+        title = self._title_font.render("Day end", True, BUTTON_TEXT)
+        self._screen.blit(title, (panel.x + 24, panel.y + 20))
+        money = self._font.render(f"Money  {state.money}", True, LABEL_COLOR)
+        money_rect = money.get_rect(topright=(panel.right - 24, panel.y + 24))
+        self._screen.blit(money, money_rect)
+        y = panel.y + 64
+        y = self._draw_order_group(
+            panel,
+            y,
+            "Completed",
+            [order for order in state.orders if order.status is OrderStatus.COMPLETED],
+        )
+        self._draw_order_group(
+            panel,
+            y + 16,
+            "Not completed",
+            [
+                order
+                for order in state.orders
+                if order.status is not OrderStatus.COMPLETED
+            ],
+        )
+
+    def _draw_order_group(
+        self,
+        panel: pygame.Rect,
+        y: int,
+        heading: str,
+        orders: Sequence[Order],
+    ) -> int:
+        head = self._font.render(heading, True, BUTTON_TEXT)
+        self._screen.blit(head, (panel.x + 24, y))
+        y += 28
+        if not orders:
+            empty = self._font.render("None", True, LABEL_COLOR)
+            self._screen.blit(empty, (panel.x + 24, y))
+            return y + 24
+        for order in orders:
+            line = self._font.render(_summary_order_label(order), True, LABEL_COLOR)
+            self._screen.blit(line, (panel.x + 24, y))
+            y += 24
+        return y
 
     def _draw_rover_card(self, rover: Rover, rect: pygame.Rect) -> None:
         pygame.draw.rect(self._screen, ROVER_CARD_BG, rect, border_radius=8)
@@ -203,7 +283,11 @@ class Ui:
         self._screen.blit(amount, (rect.x + 240, rect.y + 38))
 
     def _draw_buttons(self, state: GameState) -> None:
-        for button in build_buttons(state, WINDOW_SIZE):
+        for button in build_buttons(
+            state,
+            WINDOW_SIZE,
+            orders_open=self._orders_open,
+        ):
             enabled = button_enabled(button, state, self._selected_order)
             selected = button_selected(button, self._selected_order)
             if selected:
@@ -221,10 +305,14 @@ class Ui:
             self._screen.blit(label, dest)
 
     def _draw_hud(self, state: GameState) -> None:
-        if state.overlay_open():
+        remaining = max(0.0, state.day_length - state.day_elapsed)
+        text = (
+            f"Day  {state.day_number}    Time  {remaining:.0f}s    Money  {state.money}"
+        )
+        line = self._font.render(text, True, LABEL_COLOR)
+        self._screen.blit(line, (24, 16))
+        if state.phase is GamePhase.DAY_END or self._orders_open:
             return
-        money = self._font.render(f"Money  {state.money}", True, LABEL_COLOR)
-        self._screen.blit(money, (24, 16))
         y = 42
         for rover in state.rovers:
             y = self._draw_rover_stats(rover, 24, y)
@@ -270,6 +358,10 @@ class Ui:
                 loaded = _fit_sprite(loaded, SPRITE_MAX_SIZE[key])
             self._images[key] = loaded
         return loaded
+
+
+def _summary_order_label(order: Order) -> str:
+    return f"{order.name}  {order.endpoint.name}  ${order.reward}"
 
 
 def _fit_sprite(surface: pygame.Surface, max_size: int) -> pygame.Surface:

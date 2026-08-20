@@ -9,14 +9,29 @@ from moon_game.entities import (
     OrderStatus,
     RoverStatus,
 )
-from moon_game.game_state import GameState
+from moon_game.game_state import GamePhase, GameState
 
 
 class Simulation:
     def tick(self, state: GameState, dt: float) -> None:
+        if state.phase is not GamePhase.RUNNING:
+            return
+        state.day_elapsed += dt
+        if state.day_elapsed >= state.day_length:
+            self._end_day(state)
+            return
         for delivery in state.deliveries:
             if delivery.state is DeliveryState.ACTIVE:
                 self._advance(state, delivery, dt)
+
+    def _end_day(self, state: GameState) -> None:
+        state.phase = GamePhase.DAY_END
+        state.pending_event = None
+        for delivery in state.deliveries:
+            if delivery.state is not DeliveryState.ACTIVE:
+                continue
+            delivery.rover.status = RoverStatus.IDLE
+            delivery.rover.position = state.map.base
 
     def _advance(self, state: GameState, delivery: Delivery, dt: float) -> None:
         if delivery.route.length == 0.0:
@@ -50,8 +65,8 @@ class Simulation:
         delivery.rover.position = delivery.route.start
         delivery.rover.battery = max(0.0, delivery.rover.battery)
         state.money += delivery.order.reward
-        if any(order.status is OrderStatus.AVAILABLE for order in state.orders):
-            state.pending_event = ChooseDelivery(rover=delivery.rover)
+        state.pending_event = ChooseDelivery(rover=delivery.rover)
+        state.paused = True
 
     def _spend_battery(self, delivery: Delivery, leg_progress: float) -> None:
         cost = energy_cost(delivery.route, delivery.order)

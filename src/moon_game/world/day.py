@@ -1,0 +1,1 @@
+DAY_LENGTH = 24.0

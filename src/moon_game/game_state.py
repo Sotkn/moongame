@@ -16,6 +16,7 @@ from moon_game.entities import (
     RoverStatus,
 )
 from moon_game.geometry import Vec2
+from moon_game.world.day import DAY_LENGTH
 from moon_game.world.endpoints import ENDPOINTS
 from moon_game.world.orders import build_orders
 from moon_game.world.routes import build_routes
@@ -25,6 +26,7 @@ from moon_game.world.rovers import build_rovers
 class GamePhase(Enum):
     DAY_START = "day_start"
     RUNNING = "running"
+    DAY_END = "day_end"
 
 
 @dataclass
@@ -39,9 +41,9 @@ class GameState:
     phase: GamePhase = GamePhase.DAY_START
     pending_event: ChooseDelivery | None = None
     paused: bool = True
-
-    def overlay_open(self) -> bool:
-        return self.phase is GamePhase.DAY_START or self.pending_event is not None
+    day_number: int = 1
+    day_elapsed: float = 0.0
+    day_length: float = DAY_LENGTH
 
     def day_rover(self) -> Rover:
         event = self.pending_event
@@ -61,6 +63,16 @@ class GameState:
         order.status = OrderStatus.IN_PROGRESS
         self.deliveries.append(Delivery(rover=rover, order=order, route=route))
 
+    def start_next_day(self) -> None:
+        self.day_number += 1
+        self.orders = build_orders()
+        self.rovers = build_rovers(self.map)
+        self.deliveries = []
+        self.day_elapsed = 0.0
+        self.phase = GamePhase.DAY_START
+        self.paused = True
+        self.pending_event = None
+
     def toggle_pause(self) -> None:
         self.paused = not self.paused
 
@@ -77,4 +89,5 @@ def initial_state() -> GameState:
         rovers=build_rovers(play_map),
         routes=build_routes(play_map),
         orders=build_orders(),
+        day_length=DAY_LENGTH,
     )

@@ -5,10 +5,10 @@ from dataclasses import dataclass
 import pygame
 
 from moon_game.assignment import can_assign
-from moon_game.commands import DismissChoice, Pause
-from moon_game.entities import ChooseDelivery, Order
+from moon_game.commands import DismissChoice, NextDay, Pause, StartDay
+from moon_game.entities import Order
 from moon_game.game_state import GamePhase, GameState
-from moon_game.ui.commands import Confirm, SelectOrder
+from moon_game.ui.commands import Confirm, SelectOrder, ToggleOrders
 
 OVERLAY_SIZE = (700, 440)
 OVERLAY_PAD = 24
@@ -19,11 +19,13 @@ ROVER_CARD_GAP = 16
 ROVER_CARD_HEIGHT = 72
 BUTTON_SIZE = (140, 40)
 BUTTON_GAP = 8
-PAUSE_SIZE = (112, 36)
-PAUSE_MARGIN = 16
-PAUSE_Y = 488
+HUD_BUTTON_SIZE = (112, 36)
+HUD_MARGIN = 16
+HUD_BUTTON_Y = 8
 
-type ButtonCommand = SelectOrder | Confirm | DismissChoice | Pause
+type ButtonCommand = (
+    SelectOrder | Confirm | DismissChoice | Pause | StartDay | NextDay | ToggleOrders
+)
 
 
 @dataclass
@@ -37,10 +39,15 @@ class Button:
 def build_buttons(
     state: GameState,
     window_size: tuple[int, int],
+    *,
+    orders_open: bool,
 ) -> list[Button]:
-    if state.overlay_open():
-        return _overlay_buttons(state, window_size)
-    return [_pause_button(state, window_size)]
+    if state.phase is GamePhase.DAY_END:
+        return [_next_day_button(window_size)]
+    buttons = _hud_buttons(state, window_size)
+    if orders_open:
+        buttons.extend(_overlay_buttons(state, window_size))
+    return buttons
 
 
 def button_enabled(
@@ -48,11 +55,16 @@ def button_enabled(
     state: GameState,
     selected_order: Order | None,
 ) -> bool:
-    if isinstance(button.command, Confirm):
-        return _commit_enabled(state, selected_order)
+    command = button.command
+    if isinstance(command, Confirm):
+        return _send_enabled(state, selected_order)
+    if isinstance(command, StartDay):
+        return state.phase is GamePhase.DAY_START
+    if isinstance(command, NextDay):
+        return state.phase is GamePhase.DAY_END
     return isinstance(
-        button.command,
-        (SelectOrder, DismissChoice, Pause),
+        command,
+        (SelectOrder, DismissChoice, Pause, ToggleOrders),
     )
 
 
@@ -65,7 +77,7 @@ def button_selected(button: Button, selected_order: Order | None) -> bool:
 def overlay_title(state: GameState) -> str:
     if state.phase is GamePhase.DAY_START:
         return "Day start"
-    return "Choose delivery"
+    return "Orders"
 
 
 def overlay_reason(state: GameState, selected_order: Order | None) -> str:
@@ -97,15 +109,28 @@ def rover_card_rect(overlay: pygame.Rect, order_count: int) -> pygame.Rect:
     )
 
 
+def _hud_buttons(
+    state: GameState,
+    window_size: tuple[int, int],
+) -> list[Button]:
+    running = state.phase is GamePhase.RUNNING
+    buttons = [_orders_toggle_button(window_size, shift_for_pause=running)]
+    if running:
+        buttons.append(_pause_button(state, window_size))
+    return buttons
+
+
 def _overlay_buttons(
     state: GameState,
     window_size: tuple[int, int],
 ) -> list[Button]:
     overlay = overlay_rect(window_size)
     buttons = _order_rows(state, overlay)
-    buttons.append(_commit_button(state, overlay))
-    if isinstance(state.pending_event, ChooseDelivery):
-        buttons.append(_done_button(overlay))
+    close_index = 2 if state.phase is GamePhase.DAY_START else 1
+    buttons.append(_close_button(overlay, close_index))
+    if state.phase is GamePhase.DAY_START:
+        buttons.append(_start_day_button(overlay))
+    buttons.append(_send_button(overlay))
     return buttons
 
 
@@ -123,43 +148,67 @@ def _order_rows(state: GameState, overlay: pygame.Rect) -> list[Button]:
     return buttons
 
 
-def _commit_button(state: GameState, overlay: pygame.Rect) -> Button:
-    width, height = BUTTON_SIZE
+def _send_button(overlay: pygame.Rect) -> Button:
     return Button(
-        id="commit",
-        rect=pygame.Rect(
-            overlay.right - OVERLAY_PAD - width,
-            overlay.bottom - OVERLAY_PAD - height,
-            width,
-            height,
-        ),
-        label="Start day" if state.phase is GamePhase.DAY_START else "Send",
+        id="send",
+        rect=_overlay_action_rect(overlay, 0),
+        label="Send",
         command=Confirm(),
     )
 
 
-def _done_button(overlay: pygame.Rect) -> Button:
-    width, height = BUTTON_SIZE
+def _start_day_button(overlay: pygame.Rect) -> Button:
     return Button(
-        id="done",
-        rect=pygame.Rect(
-            overlay.right - OVERLAY_PAD - 2 * width - BUTTON_GAP,
-            overlay.bottom - OVERLAY_PAD - height,
-            width,
-            height,
-        ),
-        label="Done",
+        id="start-day",
+        rect=_overlay_action_rect(overlay, 1),
+        label="Start day",
+        command=StartDay(),
+    )
+
+
+def _close_button(overlay: pygame.Rect, index_from_right: int) -> Button:
+    return Button(
+        id="close",
+        rect=_overlay_action_rect(overlay, index_from_right),
+        label="Close",
         command=DismissChoice(),
     )
 
 
+def _next_day_button(window_size: tuple[int, int]) -> Button:
+    overlay = overlay_rect(window_size)
+    return Button(
+        id="next-day",
+        rect=_overlay_action_rect(overlay, 0),
+        label="Next day",
+        command=NextDay(),
+    )
+
+
+def _orders_toggle_button(
+    window_size: tuple[int, int],
+    *,
+    shift_for_pause: bool,
+) -> Button:
+    width, height = HUD_BUTTON_SIZE
+    x = window_size[0] - HUD_MARGIN - width
+    if shift_for_pause:
+        x -= BUTTON_GAP + width
+    return Button(
+        id="orders",
+        rect=pygame.Rect(x, HUD_BUTTON_Y, width, height),
+        label="Orders",
+        command=ToggleOrders(),
+    )
+
+
 def _pause_button(state: GameState, window_size: tuple[int, int]) -> Button:
-    width, height = PAUSE_SIZE
+    width, height = HUD_BUTTON_SIZE
     return Button(
         id="pause",
         rect=pygame.Rect(
-            window_size[0] - PAUSE_MARGIN - width,
-            PAUSE_Y,
+            window_size[0] - HUD_MARGIN - width,
+            HUD_BUTTON_Y,
             width,
             height,
         ),
@@ -168,10 +217,24 @@ def _pause_button(state: GameState, window_size: tuple[int, int]) -> Button:
     )
 
 
-def _commit_enabled(state: GameState, selected_order: Order | None) -> bool:
+def _send_enabled(state: GameState, selected_order: Order | None) -> bool:
+    if state.phase not in (GamePhase.DAY_START, GamePhase.RUNNING):
+        return False
     if selected_order is None:
         return False
     return can_assign(state, state.day_rover(), selected_order).allowed
+
+
+def _overlay_action_rect(overlay: pygame.Rect, index_from_right: int) -> pygame.Rect:
+    width, height = BUTTON_SIZE
+    x = overlay.right - OVERLAY_PAD - (index_from_right + 1) * width
+    x -= index_from_right * BUTTON_GAP
+    return pygame.Rect(
+        x,
+        overlay.bottom - OVERLAY_PAD - height,
+        width,
+        height,
+    )
 
 
 def _order_row_rect(overlay: pygame.Rect, index: int) -> pygame.Rect:

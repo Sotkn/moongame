@@ -27,8 +27,4 @@ class Session:
             self._ui.draw(self._state)
 
     def _should_tick(self) -> bool:
-        return (
-            self._state.phase is GamePhase.RUNNING
-            and self._state.pending_event is None
-            and not self._state.paused
-        )
+        return self._state.phase is GamePhase.RUNNING and not self._state.paused
