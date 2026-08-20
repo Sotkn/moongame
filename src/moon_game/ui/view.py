@@ -36,10 +36,10 @@ BATTERY_BACK = (42, 46, 54)
 BATTERY_FILL = (88, 176, 124)
 SPRITE_MAX_SIZE = {
     "rover": 48,
-    "base": 88,
-    "poi1": 56,
-    "poi2": 56,
-    "poi3": 56,
+    "base": 100,
+    "poi1": 70,
+    "poi2": 70,
+    "poi3": 70,
 }
 
 
