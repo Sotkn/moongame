@@ -67,6 +67,7 @@ class Ui:
         self._title_font = pygame.font.SysFont("segoe ui", 22)
         self._images: dict[str, pygame.Surface] = {}
         self._selected_order: Order | None = None
+        self._selected_rover: Rover | None = None
         self._orders_open = True
         self._last_phase: GamePhase | None = None
         self._last_pending: ChooseDelivery | None = None
@@ -106,10 +107,13 @@ class Ui:
         pygame.quit()
 
     def _follow_state(self, state: GameState) -> None:
+        if self._selected_rover not in state.rovers:
+            self._selected_rover = state.rovers[0] if state.rovers else None
         if isinstance(state.pending_event, ChooseDelivery) and not isinstance(
             self._last_pending, ChooseDelivery
         ):
             self._orders_open = True
+            self._selected_rover = state.pending_event.rover
         if self._last_phase is GamePhase.DAY_END and state.phase is GamePhase.DAY_START:
             self._orders_open = True
         if state.phase is GamePhase.DAY_END:
@@ -128,22 +132,20 @@ class Ui:
         for button in buttons:
             if not button.rect.collidepoint(event.position):
                 continue
-            if not button_enabled(button, state, self._selected_order):
+            if not button_enabled(
+                button, state, self._selected_rover, self._selected_order
+            ):
                 continue
-            return self._commands_from_button(button, state)
+            return self._commands_from_button(button)
         return []
 
-    def _commands_from_button(
-        self,
-        button: Button,
-        state: GameState,
-    ) -> list[PlayerCommand]:
+    def _commands_from_button(self, button: Button) -> list[PlayerCommand]:
         command = button.command
         if isinstance(command, SelectOrder):
             self._selected_order = command.order
             return []
         if isinstance(command, Confirm):
-            return self._send_command(state)
+            return self._send_command()
         if isinstance(command, ToggleOrders):
             return self._toggle_orders()
         if isinstance(command, DismissChoice):
@@ -153,11 +155,12 @@ class Ui:
             return [command]
         return []
 
-    def _send_command(self, state: GameState) -> list[PlayerCommand]:
+    def _send_command(self) -> list[PlayerCommand]:
+        rover = self._selected_rover
         order = self._selected_order
-        if order is None:
+        if rover is None or order is None:
             return []
-        return [StartDelivery(state.day_rover(), order)]
+        return [StartDelivery(rover, order)]
 
     def _toggle_orders(self) -> list[PlayerCommand]:
         if self._orders_open:
@@ -217,8 +220,10 @@ class Ui:
         title = self._title_font.render(overlay_title(state), True, BUTTON_TEXT)
         self._screen.blit(title, (panel.x + 24, panel.y + 20))
         card = rover_card_rect(panel, len(state.orders))
-        self._draw_rover_card(state.day_rover(), card)
-        reason = overlay_reason(state, self._selected_order)
+        rover = self._selected_rover
+        if rover is not None:
+            self._draw_rover_card(rover, card)
+        reason = overlay_reason(state, rover, self._selected_order)
         if reason:
             text = self._font.render(reason, True, REASON_COLOR)
             self._screen.blit(text, (card.x, card.bottom + 12))
@@ -288,7 +293,9 @@ class Ui:
             WINDOW_SIZE,
             orders_open=self._orders_open,
         ):
-            enabled = button_enabled(button, state, self._selected_order)
+            enabled = button_enabled(
+                button, state, self._selected_rover, self._selected_order
+            )
             selected = button_selected(button, self._selected_order)
             if selected:
                 color = BUTTON_SELECTED

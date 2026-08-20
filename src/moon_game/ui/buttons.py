@@ -6,7 +6,7 @@ import pygame
 
 from moon_game.assignment import can_assign
 from moon_game.commands import DismissChoice, NextDay, Pause, StartDay
-from moon_game.entities import Order
+from moon_game.entities import Order, Rover
 from moon_game.game_state import GamePhase, GameState
 from moon_game.ui.commands import Confirm, SelectOrder, ToggleOrders
 
@@ -53,11 +53,12 @@ def build_buttons(
 def button_enabled(
     button: Button,
     state: GameState,
+    selected_rover: Rover | None,
     selected_order: Order | None,
 ) -> bool:
     command = button.command
     if isinstance(command, Confirm):
-        return _send_enabled(state, selected_order)
+        return _send_enabled(state, selected_rover, selected_order)
     if isinstance(command, StartDay):
         return state.phase is GamePhase.DAY_START
     if isinstance(command, NextDay):
@@ -80,10 +81,16 @@ def overlay_title(state: GameState) -> str:
     return "Orders"
 
 
-def overlay_reason(state: GameState, selected_order: Order | None) -> str:
+def overlay_reason(
+    state: GameState,
+    selected_rover: Rover | None,
+    selected_order: Order | None,
+) -> str:
+    if selected_rover is None:
+        return "Select a rover"
     if selected_order is None:
         return "Select an order"
-    result = can_assign(state, state.day_rover(), selected_order)
+    result = can_assign(state, selected_rover, selected_order)
     if result.allowed:
         return ""
     return result.reason
@@ -217,12 +224,16 @@ def _pause_button(state: GameState, window_size: tuple[int, int]) -> Button:
     )
 
 
-def _send_enabled(state: GameState, selected_order: Order | None) -> bool:
+def _send_enabled(
+    state: GameState,
+    selected_rover: Rover | None,
+    selected_order: Order | None,
+) -> bool:
     if state.phase not in (GamePhase.DAY_START, GamePhase.RUNNING):
         return False
-    if selected_order is None:
+    if selected_rover is None or selected_order is None:
         return False
-    return can_assign(state, state.day_rover(), selected_order).allowed
+    return can_assign(state, selected_rover, selected_order).allowed
 
 
 def _overlay_action_rect(overlay: pygame.Rect, index_from_right: int) -> pygame.Rect:

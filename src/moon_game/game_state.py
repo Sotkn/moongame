@@ -45,12 +45,6 @@ class GameState:
     day_elapsed: float = 0.0
     day_length: float = DAY_LENGTH
 
-    def day_rover(self) -> Rover:
-        event = self.pending_event
-        if isinstance(event, ChooseDelivery):
-            return event.rover
-        return self.rovers[0]
-
     def start_delivery(self, rover: Rover, order: Order) -> None:
         if rover not in self.rovers or order not in self.orders:
             return
