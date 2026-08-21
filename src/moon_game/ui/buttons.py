@@ -35,8 +35,13 @@ HUD_MARGIN = 16
 HUD_BUTTON_Y = 8
 SHOP_HEADING_HEIGHT = 22
 SHOP_COMPACT_ROW = 28
+SHOP_OFFER_ROW = 56
 SHOP_SECTION_GAP = 12
 SHOP_ROW_GAP = 4
+SHOP_COLUMN_GAP = 16
+SHOP_LEFT_NUM = 5
+SHOP_LEFT_DEN = 8
+SHOP_SCROLL_STEP = 36
 ROUTE_ROW_HEIGHT = 36
 ROUTE_ROW_GAP = 12
 
@@ -69,6 +74,7 @@ def build_buttons(
     *,
     open_panel: OpenPanel,
     selected_order: Order | None = None,
+    shop_left_scroll: int = 0,
 ) -> list[Button]:
     if state.phase is GamePhase.DAY_END:
         return [_next_day_button(window_size)]
@@ -76,7 +82,7 @@ def build_buttons(
     if open_panel is OpenPanel.ASSIGNMENT:
         buttons.extend(_assignment_buttons(state, window_size, selected_order))
     elif open_panel is OpenPanel.SHOP:
-        buttons.extend(_shop_buttons(state, window_size))
+        buttons.extend(_shop_buttons(state, window_size, shop_left_scroll))
     return buttons
 
 
@@ -159,75 +165,127 @@ def overlay_rect(window_size: tuple[int, int]) -> pygame.Rect:
     )
 
 
-def shop_offer_row_rect(overlay: pygame.Rect, index: int) -> pygame.Rect:
-    return _content_row_rect(overlay, index, *_row_step(overlay))
+def shop_content_rect(overlay: pygame.Rect) -> pygame.Rect:
+    pad = _overlay_px(overlay, OVERLAY_PAD)
+    top = overlay.y + pad + _overlay_px(overlay, TITLE_HEIGHT)
+    action = _overlay_px(overlay, BUTTON_SIZE[1])
+    bottom = overlay.bottom - pad - action - _overlay_px(overlay, BUTTON_GAP)
+    return pygame.Rect(overlay.x + pad, top, overlay.width - 2 * pad, bottom - top)
 
 
-def shop_buy_rect(overlay: pygame.Rect, index: int) -> pygame.Rect:
-    row = shop_offer_row_rect(overlay, index)
+def shop_left_rect(overlay: pygame.Rect) -> pygame.Rect:
+    content = shop_content_rect(overlay)
+    gap = _overlay_px(overlay, SHOP_COLUMN_GAP)
+    width = (content.width - gap) * SHOP_LEFT_NUM // SHOP_LEFT_DEN
+    return pygame.Rect(content.x, content.y, width, content.height)
+
+
+def shop_right_rect(overlay: pygame.Rect) -> pygame.Rect:
+    content = shop_content_rect(overlay)
+    left = shop_left_rect(overlay)
+    x = left.right + _overlay_px(overlay, SHOP_COLUMN_GAP)
+    return pygame.Rect(x, content.y, content.right - x, content.height)
+
+
+def shop_jobs_viewport(overlay: pygame.Rect) -> pygame.Rect:
+    column = shop_right_rect(overlay)
+    top = column.y + _overlay_px(overlay, SHOP_HEADING_HEIGHT)
+    return pygame.Rect(column.x, top, column.width, column.bottom - top)
+
+
+def shop_offer_row_rect(
+    overlay: pygame.Rect,
+    index: int,
+    scroll: int = 0,
+) -> pygame.Rect:
+    column = shop_left_rect(overlay)
+    height = _overlay_px(overlay, SHOP_OFFER_ROW)
+    gap = _overlay_px(overlay, ROW_GAP)
+    return pygame.Rect(
+        column.x,
+        column.y + index * (height + gap) - scroll,
+        column.width,
+        height,
+    )
+
+
+def shop_buy_rect(
+    overlay: pygame.Rect,
+    index: int,
+    scroll: int = 0,
+) -> pygame.Rect:
+    row = shop_offer_row_rect(overlay, index, scroll)
     width = _overlay_px(overlay, BUTTON_SIZE[0])
     height = _overlay_px(overlay, BUTTON_SIZE[1])
     return pygame.Rect(
         row.right - width,
-        row.y,
+        row.y + (row.height - height) // 2,
         width,
         height,
     )
 
 
-def shop_park_heading_y(overlay: pygame.Rect, offer_count: int) -> int:
-    return _rows_bottom(overlay, offer_count, *_row_step(overlay)) + _overlay_px(
-        overlay, SHOP_SECTION_GAP
-    )
+def shop_park_heading_y(
+    overlay: pygame.Rect,
+    offer_count: int,
+    scroll: int = 0,
+) -> int:
+    column = shop_left_rect(overlay)
+    if offer_count <= 0:
+        return column.y - scroll
+    last = shop_offer_row_rect(overlay, offer_count - 1, scroll=0)
+    return last.bottom + _overlay_px(overlay, SHOP_SECTION_GAP) - scroll
 
 
 def shop_park_row_rect(
     overlay: pygame.Rect,
     offer_count: int,
     index: int,
+    scroll: int = 0,
 ) -> pygame.Rect:
-    y = shop_park_heading_y(overlay, offer_count) + _overlay_px(
+    column = shop_left_rect(overlay)
+    y = shop_park_heading_y(overlay, offer_count, scroll=0) + _overlay_px(
         overlay, SHOP_HEADING_HEIGHT
     )
     row = _overlay_px(overlay, SHOP_COMPACT_ROW)
     y += index * (row + _overlay_px(overlay, SHOP_ROW_GAP))
-    pad = _overlay_px(overlay, OVERLAY_PAD)
-    return pygame.Rect(
-        overlay.x + pad,
-        y,
-        overlay.width - 2 * pad,
-        row,
-    )
+    return pygame.Rect(column.x, y - scroll, column.width, row)
 
 
-def shop_jobs_heading_y(
-    overlay: pygame.Rect,
-    offer_count: int,
-    rover_count: int,
-) -> int:
-    last_park = max(0, rover_count - 1)
-    park_bottom = shop_park_row_rect(overlay, offer_count, last_park).bottom
-    return park_bottom + _overlay_px(overlay, SHOP_SECTION_GAP)
+def shop_jobs_heading_y(overlay: pygame.Rect) -> int:
+    return shop_right_rect(overlay).y
 
 
 def shop_job_row_rect(
     overlay: pygame.Rect,
+    index: int,
+    scroll: int = 0,
+) -> pygame.Rect:
+    viewport = shop_jobs_viewport(overlay)
+    row = _overlay_px(overlay, SHOP_COMPACT_ROW)
+    y = viewport.y + index * (row + _overlay_px(overlay, SHOP_ROW_GAP))
+    return pygame.Rect(viewport.x, y - scroll, viewport.width, row)
+
+
+def shop_scroll_max(
+    overlay: pygame.Rect,
     offer_count: int,
     rover_count: int,
-    index: int,
-) -> pygame.Rect:
-    y = shop_jobs_heading_y(overlay, offer_count, rover_count) + _overlay_px(
-        overlay, SHOP_HEADING_HEIGHT
+    order_count: int,
+) -> tuple[int, int]:
+    left = shop_left_rect(overlay)
+    last_park = shop_park_row_rect(
+        overlay, offer_count, max(0, rover_count - 1), scroll=0
     )
-    row = _overlay_px(overlay, SHOP_COMPACT_ROW)
-    y += index * (row + _overlay_px(overlay, SHOP_ROW_GAP))
-    pad = _overlay_px(overlay, OVERLAY_PAD)
-    return pygame.Rect(
-        overlay.x + pad,
-        y,
-        overlay.width - 2 * pad,
-        row,
-    )
+    left_max = max(0, last_park.bottom - left.y - left.height)
+    jobs = shop_jobs_viewport(overlay)
+    last_job = shop_job_row_rect(overlay, max(0, order_count - 1), scroll=0)
+    right_max = max(0, last_job.bottom - jobs.y - jobs.height)
+    return left_max, right_max
+
+
+def shop_scroll_step(overlay: pygame.Rect) -> int:
+    return _overlay_px(overlay, SHOP_SCROLL_STEP)
 
 
 def rover_card_rect(
@@ -319,9 +377,10 @@ def _assignment_buttons(
 def _shop_buttons(
     state: GameState,
     window_size: tuple[int, int],
+    left_scroll: int,
 ) -> list[Button]:
     overlay = overlay_rect(window_size)
-    buttons = _shop_buy_rows(state, overlay)
+    buttons = _shop_buy_rows(state, overlay, left_scroll)
     buttons.append(_close_button(overlay, 0, ToggleShop()))
     return buttons
 
@@ -340,13 +399,17 @@ def _order_rows(state: GameState, overlay: pygame.Rect) -> list[Button]:
     return buttons
 
 
-def _shop_buy_rows(state: GameState, overlay: pygame.Rect) -> list[Button]:
+def _shop_buy_rows(
+    state: GameState,
+    overlay: pygame.Rect,
+    left_scroll: int,
+) -> list[Button]:
     buttons: list[Button] = []
     for index, offer in enumerate(state.shop_offers):
         buttons.append(
             Button(
                 id=f"buy-{offer.id}",
-                rect=shop_buy_rect(overlay, index),
+                rect=shop_buy_rect(overlay, index, left_scroll),
                 label="Buy",
                 command=BuyRover(offer),
             )
