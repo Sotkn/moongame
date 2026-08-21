@@ -19,5 +19,17 @@ OUTPOST = Endpoint(
     position=Vec2(1100, 580),
     image_key="poi3",
 )
+LAB = Endpoint(
+    id="lab",
+    name="Лаборатория",
+    position=Vec2(169, 512),
+    image_key="poi4",
+)
+DEPOT = Endpoint(
+    id="depot",
+    name="Склад",
+    position=Vec2(623, 571),
+    image_key="poi5",
+)
 
-ENDPOINTS = [RIDGE, CRATER, OUTPOST]
+ENDPOINTS = [RIDGE, CRATER, OUTPOST, LAB, DEPOT]

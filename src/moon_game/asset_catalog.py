@@ -9,6 +9,8 @@ _FILES = {
     "poi1": "poi1.png",
     "poi2": "poi2.png",
     "poi3": "poi3.png",
+    "poi4": "poi4.png",
+    "poi5": "poi5.png",
 }
 
 

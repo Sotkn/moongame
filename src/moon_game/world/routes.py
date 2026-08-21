@@ -1,6 +1,6 @@
 from moon_game.entities import Map, Route
 from moon_game.geometry import Vec2
-from moon_game.world.endpoints import CRATER, OUTPOST, RIDGE
+from moon_game.world.endpoints import CRATER, DEPOT, LAB, OUTPOST, RIDGE
 
 
 def build_routes(play_map: Map) -> list[Route]:
@@ -46,6 +46,26 @@ def build_routes(play_map: Map) -> list[Route]:
             id="outpost",
             name="Прямой",
             endpoint=OUTPOST,
+            risk=0.1,
+        ),
+        Route.from_waypoints(
+            (
+                play_map.base,
+                Vec2(400, 520),
+            ),
+            id="lab",
+            name="Прямой",
+            endpoint=LAB,
+            risk=0.1,
+        ),
+        Route.from_waypoints(
+            (
+                play_map.base,
+                Vec2(580, 560),
+            ),
+            id="depot",
+            name="Прямой",
+            endpoint=DEPOT,
             risk=0.1,
         ),
     ]

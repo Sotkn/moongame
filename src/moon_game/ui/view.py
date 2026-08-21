@@ -92,6 +92,8 @@ SPRITE_MAX_SIZE = {
     "poi1": 70,
     "poi2": 200,
     "poi3": 70,
+    "poi4": 90,
+    "poi5": 120,
 }
 
 
