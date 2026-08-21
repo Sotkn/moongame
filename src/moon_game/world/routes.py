@@ -8,8 +8,7 @@ def build_routes(play_map: Map) -> list[Route]:
         Route.from_waypoints(
             (
                 play_map.base,
-                Vec2(380, 220),
-                Vec2(620, 280),
+                Vec2(540, 244),
             ),
             id="ridge-short",
             name="Short",
@@ -19,10 +18,10 @@ def build_routes(play_map: Map) -> list[Route]:
         Route.from_waypoints(
             (
                 play_map.base,
-                Vec2(180, 500),
-                Vec2(400, 520),
-                Vec2(650, 480),
-                Vec2(800, 400),
+                Vec2(480, 590),
+                Vec2(130, 610),
+                Vec2(45, 450),
+                Vec2(120, 270),
             ),
             id="ridge-long",
             name="Long",
@@ -32,8 +31,7 @@ def build_routes(play_map: Map) -> list[Route]:
         Route.from_waypoints(
             (
                 play_map.base,
-                Vec2(360, 340),
-                Vec2(580, 360),
+                Vec2(900, 240),
             ),
             id="crater",
             name="Direct",
@@ -43,8 +41,7 @@ def build_routes(play_map: Map) -> list[Route]:
         Route.from_waypoints(
             (
                 play_map.base,
-                Vec2(300, 470),
-                Vec2(540, 500),
+                Vec2(764, 584),
             ),
             id="outpost",
             name="Direct",

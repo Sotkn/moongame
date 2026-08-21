@@ -67,6 +67,8 @@ from moon_game.ui.commands import (
 from moon_game.window_events import WindowEvent, WindowEventKind
 
 WINDOW_SIZE = (1280, 720)
+MAP_LAYOUT_GUIDES = True
+MAP_GUIDE_STEP = 100
 ROUTE_AA = 4
 ROUTE_DARK = (22, 18, 16)
 ROUTE_LIGHT = (230, 220, 200)
@@ -154,6 +156,8 @@ class Ui:
             self._draw_shop(state)
         self._draw_hud(state)
         self._draw_buttons(state)
+        if MAP_LAYOUT_GUIDES:
+            self._draw_map_guides()
         pygame.display.flip()
 
     def close(self) -> None:
@@ -793,6 +797,23 @@ class Ui:
             return
         fill = width * max(0.0, min(1.0, rover.battery / rover.battery_max))
         pygame.draw.rect(self._screen, BATTERY_FILL, (x, y, fill, height))
+
+    def _draw_map_guides(self) -> None:
+        width, height = self._window_size
+        step = self._px(MAP_GUIDE_STEP)
+        color = (255, 220, 80)
+        for x in range(0, width, step):
+            pygame.draw.line(self._screen, color, (x, 0), (x, height))
+            self._screen.blit(self._font.render(str(x), True, color), (x + 4, 4))
+        for y in range(0, height, step):
+            pygame.draw.line(self._screen, color, (0, y), (width, y))
+            if y != 0:
+                self._screen.blit(self._font.render(str(y), True, color), (4, y + 4))
+        mx, my = pygame.mouse.get_pos()
+        world_x = round(mx / self._scale)
+        world_y = round(my / self._scale)
+        label = self._font.render(f"Vec2({world_x}, {world_y})", True, color)
+        self._screen.blit(label, (mx + 14, my + 14))
 
     def _draw_label(
         self,
