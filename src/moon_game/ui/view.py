@@ -32,13 +32,18 @@ from moon_game.hazard import HIGH_RISK
 from moon_game.purchase import can_buy
 from moon_game.ui.buttons import (
     Button,
+    assignment_left_rect,
+    assignment_park_viewport,
+    assignment_reason_y,
+    assignment_right_rect,
+    assignment_scroll_max,
     assignment_title,
     build_buttons,
     button_enabled,
     button_selected,
+    overlay_button_clip,
     overlay_reason,
     overlay_rect,
-    route_button_rect,
     rover_card_rect,
     shop_job_row_rect,
     shop_jobs_heading_y,
@@ -106,6 +111,8 @@ class Ui:
         self._open_panel = OpenPanel.ASSIGNMENT
         self._shop_left_scroll = 0
         self._shop_right_scroll = 0
+        self._assign_left_scroll = 0
+        self._assign_right_scroll = 0
         self._last_phase: GamePhase | None = None
         self._last_pending: ChooseDelivery | None = None
         self._dim = pygame.Surface(WINDOW_SIZE, pygame.SRCALPHA)
@@ -117,18 +124,20 @@ class Ui:
         state: GameState,
     ) -> list[PlayerCommand]:
         self._follow_state(state)
-        self._clamp_shop_scroll(state)
+        self._clamp_panel_scroll(state)
         buttons = build_buttons(
             state,
             self._window_size,
             open_panel=self._open_panel,
             selected_order=self._selected_order(state),
             shop_left_scroll=self._shop_left_scroll,
+            assign_left_scroll=self._assign_left_scroll,
+            assign_right_scroll=self._assign_right_scroll,
         )
         commands: list[PlayerCommand] = []
         for event in events:
             if event.kind is WindowEventKind.SCROLL:
-                self._scroll_shop(event, state)
+                self._scroll_panel(event, state)
                 continue
             commands.extend(self._commands_from_click(event, buttons, state))
         return commands
@@ -208,7 +217,11 @@ class Ui:
         current = self._selected_route(state)
         if current in candidates:
             return
-        self._selected_route_id = candidates[0].id
+        self._select_default_route(state, order)
+
+    def _select_default_route(self, state: GameState, order: Order) -> None:
+        candidates = routes_for_order(state, order)
+        self._selected_route_id = candidates[0].id if candidates else None
 
     def _commands_from_click(
         self,
@@ -218,19 +231,12 @@ class Ui:
     ) -> list[PlayerCommand]:
         if event.kind is not WindowEventKind.CLICK or event.position is None:
             return []
-        viewport = (
-            shop_left_rect(overlay_rect(self._window_size))
-            if self._open_panel is OpenPanel.SHOP
-            else None
-        )
+        overlay = overlay_rect(self._window_size)
         for button in buttons:
             if not button.rect.collidepoint(event.position):
                 continue
-            if (
-                isinstance(button.command, BuyRover)
-                and viewport is not None
-                and not viewport.collidepoint(event.position)
-            ):
+            clip = overlay_button_clip(overlay, button.command)
+            if clip is not None and not clip.collidepoint(event.position):
                 continue
             if not button_enabled(
                 button,
@@ -250,12 +256,14 @@ class Ui:
     ) -> list[PlayerCommand]:
         command = button.command
         if isinstance(command, SelectOrder):
+            if command.order_id == self._selected_order_id:
+                return []
             self._selected_order_id = command.order_id
             order = self._selected_order(state)
             if order is None:
                 self._selected_route_id = None
             else:
-                self._highlight_route_for_order(state, order)
+                self._select_default_route(state, order)
             return []
         if isinstance(command, SelectRover):
             self._selected_rover_id = command.rover_id
@@ -298,26 +306,42 @@ class Ui:
         self._open_panel = OpenPanel.SHOP
         return []
 
-    def _scroll_shop(self, event: WindowEvent, state: GameState) -> None:
-        if self._open_panel is not OpenPanel.SHOP or event.position is None:
+    def _scroll_panel(self, event: WindowEvent, state: GameState) -> None:
+        if event.position is None:
             return
         overlay = overlay_rect(self._window_size)
         step = shop_scroll_step(overlay) * event.delta
-        if shop_left_rect(overlay).collidepoint(event.position):
-            self._shop_left_scroll -= step
-        elif shop_right_rect(overlay).collidepoint(event.position):
-            self._shop_right_scroll -= step
-        self._clamp_shop_scroll(state)
+        if self._open_panel is OpenPanel.SHOP:
+            if shop_left_rect(overlay).collidepoint(event.position):
+                self._shop_left_scroll -= step
+            elif shop_right_rect(overlay).collidepoint(event.position):
+                self._shop_right_scroll -= step
+        elif self._open_panel is OpenPanel.ASSIGNMENT:
+            if assignment_left_rect(overlay).collidepoint(event.position):
+                self._assign_left_scroll -= step
+            elif assignment_right_rect(overlay).collidepoint(event.position):
+                self._assign_right_scroll -= step
+        self._clamp_panel_scroll(state)
 
-    def _clamp_shop_scroll(self, state: GameState) -> None:
-        left_max, right_max = shop_scroll_max(
-            overlay_rect(self._window_size),
+    def _clamp_panel_scroll(self, state: GameState) -> None:
+        overlay = overlay_rect(self._window_size)
+        shop_left_max, shop_right_max = shop_scroll_max(
+            overlay,
             len(state.shop_offers),
             len(state.rovers),
             len(state.orders),
         )
-        self._shop_left_scroll = max(0, min(self._shop_left_scroll, left_max))
-        self._shop_right_scroll = max(0, min(self._shop_right_scroll, right_max))
+        self._shop_left_scroll = max(0, min(self._shop_left_scroll, shop_left_max))
+        self._shop_right_scroll = max(0, min(self._shop_right_scroll, shop_right_max))
+        assign_left_max, assign_right_max = assignment_scroll_max(
+            overlay, state, self._selected_order(state)
+        )
+        self._assign_left_scroll = max(
+            0, min(self._assign_left_scroll, assign_left_max)
+        )
+        self._assign_right_scroll = max(
+            0, min(self._assign_right_scroll, assign_right_max)
+        )
 
     def _draw_map(self, state: GameState) -> None:
         self._screen.blit(self._image(state.map.image_key), (0, 0))
@@ -378,16 +402,26 @@ class Ui:
 
     def _draw_assignment(self, state: GameState) -> None:
         panel = self._draw_panel_frame()
+        self._clamp_panel_scroll(state)
         title = self._title_font.render(assignment_title(state), True, BUTTON_TEXT)
         self._screen.blit(title, (panel.x + self._px(24), panel.y + self._px(20)))
-        rover_count = len(state.rovers)
+        left = assignment_left_rect(panel)
+        right = assignment_right_rect(panel)
+        park = assignment_park_viewport(panel)
+        park_heading = self._font.render("Park", True, BUTTON_TEXT)
+        jobs_heading = self._font.render("Jobs", True, BUTTON_TEXT)
+        self._screen.blit(park_heading, (left.x, left.y))
+        self._screen.blit(jobs_heading, (right.x, right.y))
+        previous = self._screen.get_clip()
+        self._screen.set_clip(park)
         for index, rover in enumerate(state.rovers):
-            card = rover_card_rect(panel, len(state.orders), index, rover_count)
+            card = rover_card_rect(panel, index, self._assign_left_scroll)
             self._draw_rover_card(
                 rover,
                 card,
                 selected=rover.id == self._selected_rover_id,
             )
+        self._screen.set_clip(previous)
         reason = overlay_reason(
             state,
             self._selected_rover(state),
@@ -396,28 +430,11 @@ class Ui:
         )
         if reason:
             text = self._font.render(reason, True, REASON_COLOR)
-            reason_x = panel.x + self._px(24)
-            reason_y = panel.y + self._px(64)
-            if rover_count:
-                card = rover_card_rect(panel, len(state.orders), 0, rover_count)
-                reason_x = card.x
-                reason_y = card.bottom + self._px(12)
-            order = self._selected_order(state)
-            routes = routes_for_order(state, order) if order is not None else []
-            if routes:
-                row = route_button_rect(
-                    panel,
-                    len(state.orders),
-                    rover_count,
-                    0,
-                    len(routes),
-                )
-                reason_y = row.bottom + self._px(12)
-            self._screen.blit(text, (reason_x, reason_y))
+            self._screen.blit(text, (left.x, assignment_reason_y(panel)))
 
     def _draw_shop(self, state: GameState) -> None:
         panel = self._draw_panel_frame()
-        self._clamp_shop_scroll(state)
+        self._clamp_panel_scroll(state)
         title = self._title_font.render("Shop", True, BUTTON_TEXT)
         self._screen.blit(title, (panel.x + self._px(24), panel.y + self._px(20)))
         previous = self._screen.get_clip()
@@ -597,24 +614,24 @@ class Ui:
 
     def _draw_buttons(self, state: GameState) -> None:
         overlay = overlay_rect(self._window_size)
-        buy_clip = (
-            shop_left_rect(overlay) if self._open_panel is OpenPanel.SHOP else None
-        )
         for button in build_buttons(
             state,
             self._window_size,
             open_panel=self._open_panel,
             selected_order=self._selected_order(state),
             shop_left_scroll=self._shop_left_scroll,
+            assign_left_scroll=self._assign_left_scroll,
+            assign_right_scroll=self._assign_right_scroll,
         ):
             if isinstance(button.command, SelectRover):
                 continue
+            clip = overlay_button_clip(overlay, button.command)
             previous = None
-            if isinstance(button.command, BuyRover) and buy_clip is not None:
-                if not buy_clip.colliderect(button.rect):
+            if clip is not None:
+                if not clip.colliderect(button.rect):
                     continue
                 previous = self._screen.get_clip()
-                self._screen.set_clip(buy_clip)
+                self._screen.set_clip(clip)
             enabled = button_enabled(
                 button,
                 state,
@@ -639,7 +656,7 @@ class Ui:
                 self._screen, color, button.rect, border_radius=self._px(6)
             )
             label = self._font.render(button.label, True, BUTTON_TEXT)
-            if isinstance(button.command, SelectOrder):
+            if isinstance(button.command, (SelectOrder, SelectRoute)):
                 dest = label.get_rect(
                     midleft=(button.rect.x + self._px(12), button.rect.centery)
                 )
