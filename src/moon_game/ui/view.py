@@ -28,7 +28,6 @@ from moon_game.entities import (
 )
 from moon_game.game_state import GamePhase, GameState
 from moon_game.geometry import Vec2
-from moon_game.hazard import HIGH_RISK
 from moon_game.purchase import can_buy
 from moon_game.ui.buttons import (
     Button,
@@ -68,10 +67,9 @@ from moon_game.ui.commands import (
 from moon_game.window_events import WindowEvent, WindowEventKind
 
 WINDOW_SIZE = (1280, 720)
-ROUTE_COLOR = (92, 98, 112)
-ROUTE_HIGHLIGHT = (168, 196, 224)
-ROUTE_HIGH_RISK = (196, 108, 72)
-ROUTE_HIGH_RISK_HIGHLIGHT = (232, 168, 120)
+ROUTE_AA = 4
+ROUTE_DARK = (22, 18, 16)
+ROUTE_LIGHT = (230, 220, 200)
 BUTTON_IDLE = (70, 92, 122)
 BUTTON_SELECTED = (110, 150, 190)
 BUTTON_DISABLED = (48, 54, 64)
@@ -117,6 +115,7 @@ class Ui:
         self._last_pending: ChooseDelivery | None = None
         self._dim = pygame.Surface(WINDOW_SIZE, pygame.SRCALPHA)
         self._dim.fill(OVERLAY_DIM)
+        self._route_overlays: dict[str | None, pygame.Surface] = {}
 
     def read_commands(
         self,
@@ -346,11 +345,7 @@ class Ui:
     def _draw_map(self, state: GameState) -> None:
         self._screen.blit(self._image(state.map.image_key), (0, 0))
         highlighted = self._selected_route(state)
-        for route in state.routes:
-            if route is not highlighted:
-                self._draw_route(route, highlighted=False)
-        if highlighted is not None:
-            self._draw_route(highlighted, highlighted=True)
+        self._screen.blit(self._routes_overlay(state, highlighted), (0, 0))
         for endpoint in state.endpoints:
             self._draw_endpoint(endpoint)
         self._draw_marker(
@@ -360,15 +355,78 @@ class Ui:
             above=False,
         )
 
-    def _draw_route(self, route: Route, *, highlighted: bool) -> None:
-        points = [self._world_pos(point) for point in route.waypoints]
-        high_risk = route.risk >= HIGH_RISK
+    def _routes_overlay(
+        self,
+        state: GameState,
+        highlighted: Route | None,
+    ) -> pygame.Surface:
+        key = highlighted.id if highlighted is not None else None
+        cached = self._route_overlays.get(key)
+        if cached is not None:
+            return cached
+        overlay = self._render_routes(state.routes, highlighted)
+        self._route_overlays[key] = overlay
+        return overlay
+
+    def _render_routes(
+        self,
+        routes: Sequence[Route],
+        highlighted: Route | None,
+    ) -> pygame.Surface:
+        wide_size = (
+            self._window_size[0] * ROUTE_AA,
+            self._window_size[1] * ROUTE_AA,
+        )
+        wide = pygame.Surface(wide_size, pygame.SRCALPHA)
+        for route in routes:
+            if route is not highlighted:
+                self._draw_route(wide, route, highlighted=False)
+        if highlighted is not None:
+            self._draw_route(wide, highlighted, highlighted=True)
+        overlay = pygame.transform.smoothscale(wide, self._window_size)
+        return overlay.convert_alpha()
+
+    def _draw_route(
+        self,
+        surface: pygame.Surface,
+        route: Route,
+        *,
+        highlighted: bool,
+    ) -> None:
+        points = [self._route_point(point) for point in route.waypoints]
         if highlighted:
-            color = ROUTE_HIGH_RISK_HIGHLIGHT if high_risk else ROUTE_HIGHLIGHT
+            outer, inner, core = (
+                self._px(16) * ROUTE_AA,
+                self._px(12) * ROUTE_AA,
+                self._px(3) * ROUTE_AA,
+            )
         else:
-            color = ROUTE_HIGH_RISK if high_risk else ROUTE_COLOR
-        width = self._px(5) if highlighted else self._px(3)
-        pygame.draw.lines(self._screen, color, False, points, width)
+            outer, inner, core = (
+                self._px(12) * ROUTE_AA,
+                self._px(8) * ROUTE_AA,
+                self._px(2) * ROUTE_AA,
+            )
+        self._stroke_polyline(surface, points, ROUTE_DARK, outer)
+        self._stroke_polyline(surface, points, ROUTE_LIGHT, inner)
+        self._stroke_polyline(surface, points, ROUTE_DARK, core)
+
+    def _stroke_polyline(
+        self,
+        surface: pygame.Surface,
+        points: list[tuple[int, int]],
+        color: tuple[int, int, int],
+        width: int,
+    ) -> None:
+        pygame.draw.lines(surface, color, False, points, width)
+        radius = width // 2
+        if radius < 1:
+            return
+        for point in points:
+            pygame.draw.circle(surface, color, point, radius)
+
+    def _route_point(self, point: Vec2) -> tuple[int, int]:
+        scale = self._scale * ROUTE_AA
+        return (round(point.x * scale), round(point.y * scale))
 
     def _draw_endpoint(self, endpoint: Endpoint) -> None:
         self._draw_marker(
