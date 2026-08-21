@@ -65,7 +65,11 @@ class BuyRover:
     offer: ShopOffer
 
     def apply(self, state: GameState) -> None:
-        if state.phase not in (GamePhase.DAY_START, GamePhase.RUNNING):
+        if state.phase not in (
+            GamePhase.DAY_START,
+            GamePhase.RUNNING,
+            GamePhase.DAY_END,
+        ):
             return
         state.buy_rover(self.offer)
 

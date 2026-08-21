@@ -49,6 +49,7 @@ class Rover:
     battery: float
     battery_max: float
     status: RoverStatus = RoverStatus.IDLE
+    facing: Vec2 = Vec2(1.0, 0.0)
 
 
 @dataclass(frozen=True)
@@ -117,19 +118,34 @@ class Route:
         return self.waypoints[0]
 
     def point_at(self, progress: float, *, reverse: bool = False) -> Vec2:
+        start, end, ratio = self._along(progress, reverse=reverse)
+        return start.lerp(end, ratio)
+
+    def direction_at(self, progress: float, *, reverse: bool = False) -> Vec2:
+        start, end, _ = self._along(progress, reverse=reverse)
+        dx = end.x - start.x
+        dy = end.y - start.y
+        if reverse:
+            return Vec2(-dx, -dy)
+        return Vec2(dx, dy)
+
+    def _along(
+        self, progress: float, *, reverse: bool = False
+    ) -> tuple[Vec2, Vec2, float]:
         t = 1.0 - progress if reverse else progress
         t = max(0.0, min(1.0, t))
+        origin = self.waypoints[0]
         if self.length == 0.0:
-            return self.waypoints[0]
-        target = t * self.length
-        remaining = target
+            return origin, origin, 0.0
+        remaining = t * self.length
         for start, end in pairwise(self.waypoints):
             segment = start.distance_to(end)
             if remaining <= segment or end is self.waypoints[-1]:
                 ratio = remaining / segment if segment > 0.0 else 0.0
-                return start.lerp(end, ratio)
+                return start, end, ratio
             remaining -= segment
-        return self.waypoints[-1]
+        last = self.waypoints[-1]
+        return last, last, 0.0
 
 
 @dataclass

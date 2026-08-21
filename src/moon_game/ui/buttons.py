@@ -94,7 +94,9 @@ def build_buttons(
     if state.phase is GamePhase.DAY_END:
         if state.is_final_day():
             return []
-        return [_next_day_button(window_size)]
+        if open_panel is OpenPanel.SHOP:
+            return _shop_buttons(state, window_size, shop_left_scroll)
+        return [_continue_button(window_size)]
     buttons = _hud_buttons(state, window_size)
     if open_panel is OpenPanel.ASSIGNMENT:
         buttons.extend(
@@ -522,7 +524,10 @@ def _shop_buttons(
 ) -> list[Button]:
     overlay = overlay_rect(window_size)
     buttons = _shop_buy_rows(state, overlay, left_scroll)
-    buttons.append(_close_button(overlay, 0, ToggleShop()))
+    if state.phase is GamePhase.DAY_END:
+        buttons.append(_next_day_button(window_size))
+    else:
+        buttons.append(_close_button(overlay, 0, ToggleShop()))
     return buttons
 
 
@@ -636,6 +641,16 @@ def _close_button(
     )
 
 
+def _continue_button(window_size: tuple[int, int]) -> Button:
+    overlay = overlay_rect(window_size)
+    return Button(
+        id="continue",
+        rect=_overlay_action_rect(overlay, 0),
+        label="Продолжить",
+        command=ToggleShop(),
+    )
+
+
 def _next_day_button(window_size: tuple[int, int]) -> Button:
     overlay = overlay_rect(window_size)
     return Button(
@@ -660,7 +675,11 @@ def _send_enabled(
 
 
 def _buy_enabled(state: GameState, offer: ShopOffer) -> bool:
-    if state.phase not in (GamePhase.DAY_START, GamePhase.RUNNING):
+    if state.phase not in (
+        GamePhase.DAY_START,
+        GamePhase.RUNNING,
+        GamePhase.DAY_END,
+    ):
         return False
     return can_buy(state, offer).allowed
 

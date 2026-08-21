@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import math
 from collections.abc import Sequence
 
 import pygame
@@ -71,7 +72,7 @@ from moon_game.ui.commands import (
 from moon_game.window_events import WindowEvent, WindowEventKind
 
 WINDOW_SIZE = (1280, 720)
-MAP_LAYOUT_GUIDES = True
+MAP_LAYOUT_GUIDES = False
 MAP_GUIDE_STEP = 100
 ROUTE_AA = 4
 ROUTE_DARK = (22, 18, 16)
@@ -155,7 +156,9 @@ class Ui:
         self._draw_map(state)
         for rover in state.rovers:
             self._draw_rover(rover)
-        if state.phase is GamePhase.DAY_END:
+        if state.phase is GamePhase.DAY_END and self._open_panel is OpenPanel.SHOP:
+            self._draw_shop(state)
+        elif state.phase is GamePhase.DAY_END:
             self._draw_day_end(state)
         elif self._open_panel is OpenPanel.ASSIGNMENT:
             self._draw_assignment(state)
@@ -180,7 +183,10 @@ class Ui:
             self._open_panel = OpenPanel.ASSIGNMENT
             self._selected_order_id = None
             self._selected_route_id = None
-        if state.phase is GamePhase.DAY_END:
+        if (
+            self._last_phase is not GamePhase.DAY_END
+            and state.phase is GamePhase.DAY_END
+        ):
             self._open_panel = OpenPanel.NONE
         self._last_pending = state.pending_event
         self._last_phase = state.phase
@@ -452,6 +458,9 @@ class Ui:
 
     def _draw_rover(self, rover: Rover) -> None:
         image = self._image(rover.image_key)
+        angle = math.degrees(math.atan2(-rover.facing.y, rover.facing.x))
+        if angle != 0.0:
+            image = pygame.transform.rotozoom(image, angle, 1.0)
         rect = image.get_rect(center=self._world_pos(rover.position))
         self._screen.blit(image, rect)
 

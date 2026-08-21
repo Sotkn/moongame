@@ -74,6 +74,7 @@ class GameState:
         if not can_assign(self, rover, order, route).allowed:
             return
         rover.status = RoverStatus.EN_ROUTE
+        rover.facing = route.direction_at(0.0)
         order.status = OrderStatus.IN_PROGRESS
         self.deliveries.append(Delivery(rover=rover, order=order, route=route))
 

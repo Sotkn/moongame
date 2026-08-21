@@ -109,6 +109,7 @@ class Simulation:
             delivery.progress = 0.0
             delivery.rover.status = RoverStatus.RETURNING
             delivery.rover.position = delivery.route.endpoint.position
+            self._update_facing(delivery)
             return False
         self._finish(state, delivery)
         return True
@@ -133,3 +134,13 @@ class Simulation:
             delivery.progress,
             reverse=reverse,
         )
+        self._update_facing(delivery)
+
+    def _update_facing(self, delivery: Delivery) -> None:
+        reverse = delivery.direction is DeliveryDirection.RETURNING
+        direction = delivery.route.direction_at(
+            delivery.progress,
+            reverse=reverse,
+        )
+        if direction.x != 0.0 or direction.y != 0.0:
+            delivery.rover.facing = direction
