@@ -5,6 +5,7 @@ def build_rovers(play_map: Map) -> list[Rover]:
     return [
         Rover(
             id="hauler",
+            name="Тягач",
             position=play_map.base,
             speed=140.0,
             image_key="rover",
@@ -14,6 +15,7 @@ def build_rovers(play_map: Map) -> list[Rover]:
         ),
         Rover(
             id="runner",
+            name="Бегун",
             position=play_map.base,
             speed=160.0,
             image_key="rover",
@@ -23,6 +25,7 @@ def build_rovers(play_map: Map) -> list[Rover]:
         ),
         Rover(
             id="scout",
+            name="Разведчик",
             position=play_map.base,
             speed=120.0,
             image_key="rover",

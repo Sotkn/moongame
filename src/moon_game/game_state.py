@@ -80,6 +80,7 @@ class GameState:
         self.rovers.append(
             Rover(
                 id=offer.id,
+                name=offer.name,
                 position=self.map.base,
                 speed=offer.speed,
                 image_key=offer.image_key,

@@ -5,6 +5,7 @@ def build_shop_offers() -> list[ShopOffer]:
     return [
         ShopOffer(
             id="mule",
+            name="Мул",
             capacity=20,
             battery_max=160.0,
             speed=140.0,
@@ -13,6 +14,7 @@ def build_shop_offers() -> list[ShopOffer]:
         ),
         ShopOffer(
             id="dash",
+            name="Спринтер",
             capacity=8,
             battery_max=200.0,
             speed=180.0,

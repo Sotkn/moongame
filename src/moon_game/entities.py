@@ -41,6 +41,7 @@ class Map:
 @dataclass
 class Rover:
     id: str
+    name: str
     position: Vec2
     speed: float
     image_key: str
@@ -53,6 +54,7 @@ class Rover:
 @dataclass(frozen=True)
 class ShopOffer:
     id: str
+    name: str
     capacity: int
     battery_max: float
     speed: float

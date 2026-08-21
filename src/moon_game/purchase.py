@@ -17,7 +17,7 @@ class BuyResult:
 
 def can_buy(state: GameState, offer: ShopOffer) -> BuyResult:
     if offer not in state.shop_offers:
-        return BuyResult(False, "Offer gone")
+        return BuyResult(False, "Предложение снято")
     if state.money < offer.price:
-        return BuyResult(False, "Not enough money")
+        return BuyResult(False, "Не хватает денег")
     return BuyResult(True)

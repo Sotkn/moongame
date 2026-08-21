@@ -31,27 +31,27 @@ def can_assign(
     route: Route,
 ) -> AssignResult:
     if rover not in state.rovers:
-        return AssignResult(False, "Rover is not available")
+        return AssignResult(False, "Ровер недоступен")
     if order not in state.orders:
-        return AssignResult(False, "Order is not available")
+        return AssignResult(False, "Заказ недоступен")
     if rover.status is not RoverStatus.IDLE:
-        return AssignResult(False, "Rover is busy")
+        return AssignResult(False, "Ровер занят")
     if rover.position != state.map.base:
-        return AssignResult(False, "Rover is not at base")
+        return AssignResult(False, "Ровер не на базе")
     if order.status is not OrderStatus.AVAILABLE:
-        return AssignResult(False, "Order is not available")
+        return AssignResult(False, "Заказ недоступен")
     if order.weight > rover.capacity:
-        return AssignResult(False, "Too heavy")
+        return AssignResult(False, "Слишком тяжело")
     if not routes_for_order(state, order):
-        return AssignResult(False, "No route to that destination")
+        return AssignResult(False, "Нет маршрута к точке")
     if route not in state.routes:
-        return AssignResult(False, "Route is not available")
+        return AssignResult(False, "Маршрут недоступен")
     if route.endpoint != order.endpoint:
-        return AssignResult(False, "Route is not for that destination")
+        return AssignResult(False, "Маршрут не к этой точке")
     if rover.battery < energy_cost(route, order):
-        return AssignResult(False, "Not enough battery")
+        return AssignResult(False, "Не хватает батареи")
     if state.day_elapsed + trip_time(route, rover) > order.deadline:
-        return AssignResult(False, "Would miss deadline")
+        return AssignResult(False, "Не успеть к сроку")
     return AssignResult(True)
 
 

@@ -98,7 +98,7 @@ SPRITE_MAX_SIZE = {
 class Ui:
     def __init__(self) -> None:
         pygame.init()
-        pygame.display.set_caption("Moon Courier Crisis")
+        pygame.display.set_caption("Кризис лунного курьера")
         self._scale = 1.0
         self._window_size = WINDOW_SIZE
         self._screen = pygame.display.set_mode(WINDOW_SIZE)
@@ -355,7 +355,7 @@ class Ui:
         self._draw_marker(
             self._image("base"),
             self._world_pos(state.map.base),
-            "Base",
+            "База",
             above=False,
         )
 
@@ -470,8 +470,8 @@ class Ui:
         left = assignment_left_rect(panel)
         right = assignment_right_rect(panel)
         park = assignment_park_viewport(panel)
-        park_heading = self._font.render("Park", True, BUTTON_TEXT)
-        jobs_heading = self._font.render("Jobs", True, BUTTON_TEXT)
+        park_heading = self._font.render("Парк", True, BUTTON_TEXT)
+        jobs_heading = self._font.render("Заказы", True, BUTTON_TEXT)
         self._screen.blit(park_heading, (left.x, left.y))
         self._screen.blit(jobs_heading, (right.x, right.y))
         previous = self._screen.get_clip()
@@ -497,7 +497,7 @@ class Ui:
     def _draw_shop(self, state: GameState) -> None:
         panel = self._draw_panel_frame()
         self._clamp_panel_scroll(state)
-        title = self._title_font.render("Shop", True, BUTTON_TEXT)
+        title = self._title_font.render("Магазин", True, BUTTON_TEXT)
         self._screen.blit(title, (panel.x + self._px(24), panel.y + self._px(20)))
         previous = self._screen.get_clip()
         self._screen.set_clip(shop_left_rect(panel))
@@ -505,7 +505,7 @@ class Ui:
         self._draw_shop_park(state, panel)
         self._screen.set_clip(previous)
         jobs_view = shop_jobs_viewport(panel)
-        heading = self._font.render("Jobs", True, BUTTON_TEXT)
+        heading = self._font.render("Заказы", True, BUTTON_TEXT)
         self._screen.blit(heading, (jobs_view.x, shop_jobs_heading_y(panel)))
         self._screen.set_clip(jobs_view)
         self._draw_shop_jobs(state, panel)
@@ -544,13 +544,13 @@ class Ui:
     def _draw_shop_park(self, state: GameState, panel: pygame.Rect) -> None:
         offer_count = len(state.shop_offers)
         scroll = self._shop_left_scroll
-        heading = self._font.render("Park", True, BUTTON_TEXT)
+        heading = self._font.render("Парк", True, BUTTON_TEXT)
         self._screen.blit(
             heading,
             (shop_left_rect(panel).x, shop_park_heading_y(panel, offer_count, scroll)),
         )
         if not state.rovers:
-            empty = self._font.render("None", True, LABEL_COLOR)
+            empty = self._font.render("Нет", True, LABEL_COLOR)
             row = shop_park_row_rect(panel, offer_count, 0, scroll)
             self._screen.blit(
                 empty,
@@ -571,7 +571,7 @@ class Ui:
     def _draw_shop_jobs(self, state: GameState, panel: pygame.Rect) -> None:
         scroll = self._shop_right_scroll
         if not state.orders:
-            empty = self._font.render("None", True, LABEL_COLOR)
+            empty = self._font.render("Нет", True, LABEL_COLOR)
             row = shop_job_row_rect(panel, 0, scroll)
             self._screen.blit(
                 empty,
@@ -591,9 +591,9 @@ class Ui:
 
     def _draw_day_end(self, state: GameState) -> None:
         panel = self._draw_panel_frame()
-        title = self._title_font.render("Day end", True, BUTTON_TEXT)
+        title = self._title_font.render("Конец дня", True, BUTTON_TEXT)
         self._screen.blit(title, (panel.x + self._px(24), panel.y + self._px(20)))
-        money = self._font.render(f"Money  {state.money}", True, LABEL_COLOR)
+        money = self._font.render(f"Деньги  {state.money}", True, LABEL_COLOR)
         money_rect = money.get_rect(
             topright=(panel.right - self._px(24), panel.y + self._px(24))
         )
@@ -602,19 +602,19 @@ class Ui:
         y = self._draw_order_group(
             panel,
             y,
-            "Completed",
+            "Выполнены",
             [order for order in state.orders if order.status is OrderStatus.COMPLETED],
         )
         y = self._draw_order_group(
             panel,
             y + self._px(16),
-            "Failed",
+            "Провалены",
             [order for order in state.orders if order.status is OrderStatus.FAILED],
         )
         self._draw_order_group(
             panel,
             y + self._px(16),
-            "Not completed",
+            "Не выполнены",
             [
                 order
                 for order in state.orders
@@ -633,7 +633,7 @@ class Ui:
         self._screen.blit(head, (panel.x + self._px(24), y))
         y += self._px(28)
         if not orders:
-            empty = self._font.render("None", True, LABEL_COLOR)
+            empty = self._font.render("Нет", True, LABEL_COLOR)
             self._screen.blit(empty, (panel.x + self._px(24), y))
             return y + self._px(24)
         for order in orders:
@@ -659,14 +659,14 @@ class Ui:
                 width=self._px(2),
                 border_radius=self._px(8),
             )
-        name = self._font.render(rover.id, True, BUTTON_TEXT)
+        name = self._font.render(rover.name, True, BUTTON_TEXT)
         self._screen.blit(name, (rect.x + self._px(12), rect.y + self._px(12)))
         status = self._font.render(_rover_status_label(rover), True, LABEL_COLOR)
         status_rect = status.get_rect(
             topright=(rect.right - self._px(12), rect.y + self._px(12))
         )
         self._screen.blit(status, status_rect)
-        cap = self._font.render(f"cap {rover.capacity}", True, LABEL_COLOR)
+        cap = self._font.render(f"груз {rover.capacity}", True, LABEL_COLOR)
         self._screen.blit(cap, (rect.x + self._px(12), rect.y + self._px(38)))
         bar_x = rect.x + self._px(88)
         self._draw_battery_bar(bar_x, rect.y + self._px(44), rover)
@@ -730,9 +730,8 @@ class Ui:
 
     def _draw_hud(self, state: GameState) -> None:
         remaining = max(0.0, state.day_length - state.day_elapsed)
-        text = (
-            f"Day  {state.day_number}    Time  {remaining:.0f}s    Money  {state.money}"
-        )
+        clock = f"День  {state.day_number}    Время  {remaining:.0f}с"
+        text = f"{clock}    Деньги  {state.money}"
         line = self._font.render(text, True, LABEL_COLOR)
         notice = (
             self._font.render(state.hazard_notice, True, REASON_COLOR)
@@ -780,10 +779,10 @@ class Ui:
             y = self._draw_rover_stats(rover, self._px(24), y)
 
     def _draw_rover_stats(self, rover: Rover, x: int, y: int) -> int:
-        label = f"{rover.id}  cap {rover.capacity}"
+        label = f"{rover.name}  груз {rover.capacity}"
         line = self._font.render(label, True, LABEL_COLOR)
         self._screen.blit(line, (x, y))
-        bar_x = x + self._px(148)
+        bar_x = x + self._px(190)
         self._draw_battery_bar(bar_x, y + self._px(6), rover)
         battery = f"{rover.battery:.0f}/{rover.battery_max:.0f}"
         amount = self._font.render(battery, True, LABEL_COLOR)
@@ -848,15 +847,14 @@ class Ui:
 
 
 def _shop_label(offer: ShopOffer) -> str:
-    return (
-        f"{offer.id}  cap {offer.capacity}  bat {offer.battery_max:.0f}  ${offer.price}"
-    )
+    stats = f"груз {offer.capacity}  бат {offer.battery_max:.0f}"
+    return f"{offer.name}  {stats}  ${offer.price}"
 
 
 def _shop_park_label(rover: Rover) -> str:
     battery = f"{rover.battery:.0f}/{rover.battery_max:.0f}"
     status = _rover_status_label(rover)
-    return f"{rover.id}  cap {rover.capacity}  bat {battery}  {status}"
+    return f"{rover.name}  груз {rover.capacity}  бат {battery}  {status}"
 
 
 def _shop_job_label(order: Order) -> str:
@@ -869,8 +867,8 @@ def _summary_order_label(order: Order) -> str:
 
 def _rover_status_label(rover: Rover) -> str:
     if rover.status is RoverStatus.IDLE:
-        return "idle"
-    return "on a trip"
+        return "стоит"
+    return "в рейсе"
 
 
 def _fit_sprite(surface: pygame.Surface, max_size: int) -> pygame.Surface:

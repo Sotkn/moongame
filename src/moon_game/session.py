@@ -44,7 +44,7 @@ class Session:
     def _apply_sim_event(self, event: SimEvent) -> None:
         if isinstance(event, HazardStruck):
             self._state.hazard_notice = (
-                f"{event.rover.id} hit a hazard on "
+                f"{event.rover.name} попал в аварию на маршруте "
                 f"{event.route.endpoint.name} {event.route.name}"
             )
             return

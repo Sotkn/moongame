@@ -9,7 +9,7 @@ HAZARD_ENERGY = 20.0
 
 
 def risk_label(route: Route) -> str:
-    return "High" if route.risk >= HIGH_RISK else "Low"
+    return "Высокий" if route.risk >= HIGH_RISK else "Низкий"
 
 
 def roll_hazard(route: Route, rng: Random) -> bool:

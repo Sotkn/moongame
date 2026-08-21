@@ -6,7 +6,7 @@ import pygame
 
 from moon_game.assignment import can_assign, routes_for_order
 from moon_game.commands import BuyRover, EndDay, NextDay, Pause, StartDay
-from moon_game.entities import Order, Route, Rover, ShopOffer
+from moon_game.entities import Order, OrderStatus, Route, Rover, ShopOffer
 from moon_game.game_state import GamePhase, GameState
 from moon_game.hazard import risk_label
 from moon_game.purchase import can_buy
@@ -29,7 +29,7 @@ ROVER_CARD_INNER_GAP = 12
 ROVER_CARD_HEIGHT = 72
 BUTTON_SIZE = (140, 40)
 BUTTON_GAP = 8
-HUD_BUTTON_SIZE = (112, 36)
+HUD_BUTTON_SIZE = (130, 36)
 HUD_MARGIN = 16
 HUD_BUTTON_Y = 8
 SHOP_HEADING_HEIGHT = 22
@@ -144,8 +144,8 @@ def button_selected(
 
 def assignment_title(state: GameState) -> str:
     if state.phase is GamePhase.DAY_START:
-        return "Day start"
-    return "Orders"
+        return "Начало дня"
+    return "Заказы"
 
 
 def overlay_reason(
@@ -155,11 +155,11 @@ def overlay_reason(
     selected_route: Route | None,
 ) -> str:
     if selected_rover is None:
-        return "Select a rover"
+        return "Выберите ровер"
     if selected_order is None:
-        return "Select an order"
+        return "Выберите заказ"
     if selected_route is None:
-        return "Select a route"
+        return "Выберите маршрут"
     result = can_assign(state, selected_rover, selected_order, selected_route)
     if result.allowed:
         return ""
@@ -428,11 +428,11 @@ def _hud_buttons(
         )
         x -= gap
 
-    add("end-day", "End day", EndDay())
+    add("end-day", "Конец дня", EndDay())
     if state.phase is GamePhase.RUNNING:
-        add("pause", "Resume" if state.paused else "Pause", Pause())
-    add("shop", "Shop", ToggleShop())
-    add("assign", "Assign", ToggleAssign())
+        add("pause", "Продолжить" if state.paused else "Пауза", Pause())
+    add("shop", "Магазин", ToggleShop())
+    add("assign", "Заказы", ToggleAssign())
     return buttons
 
 
@@ -498,7 +498,7 @@ def _shop_buy_rows(
             Button(
                 id=f"buy-{offer.id}",
                 rect=shop_buy_rect(overlay, index, left_scroll),
-                label="Buy",
+                label="Купить",
                 command=BuyRover(offer),
             )
         )
@@ -516,7 +516,7 @@ def _rover_cards(
             Button(
                 id=f"rover-{rover.id}",
                 rect=rover_card_rect(overlay, index, scroll),
-                label=rover.id,
+                label=rover.name,
                 command=SelectRover(rover.id),
             )
         )
@@ -549,7 +549,7 @@ def _send_button(overlay: pygame.Rect) -> Button:
     return Button(
         id="send",
         rect=_overlay_action_rect(overlay, 0),
-        label="Send",
+        label="Отправить",
         command=Confirm(),
     )
 
@@ -558,7 +558,7 @@ def _start_day_button(overlay: pygame.Rect) -> Button:
     return Button(
         id="start-day",
         rect=_overlay_action_rect(overlay, 1),
-        label="Start day",
+        label="Начать день",
         command=StartDay(),
     )
 
@@ -571,7 +571,7 @@ def _close_button(
     return Button(
         id="close",
         rect=_overlay_action_rect(overlay, index_from_right),
-        label="Close",
+        label="Закрыть",
         command=command,
     )
 
@@ -581,7 +581,7 @@ def _next_day_button(window_size: tuple[int, int]) -> Button:
     return Button(
         id="next-day",
         rect=_overlay_action_rect(overlay, 0),
-        label="Next day",
+        label="Новый день",
         command=NextDay(),
     )
 
@@ -682,9 +682,19 @@ def _order_label(order: Order, day_elapsed: float) -> str:
     remaining = max(0.0, order.deadline - day_elapsed)
     return (
         f"{order.name}  {order.endpoint.name}  "
-        f"wt {order.weight}  ${order.reward}  "
-        f"due {remaining:.0f}s  {order.status.value}"
+        f"вес {order.weight}  ${order.reward}  "
+        f"срок {remaining:.0f}с  {_order_status_label(order)}"
     )
+
+
+def _order_status_label(order: Order) -> str:
+    if order.status is OrderStatus.AVAILABLE:
+        return "доступен"
+    if order.status is OrderStatus.IN_PROGRESS:
+        return "в работе"
+    if order.status is OrderStatus.COMPLETED:
+        return "выполнен"
+    return "провален"
 
 
 def _route_label(route: Route) -> str:

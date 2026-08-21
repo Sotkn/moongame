@@ -7,7 +7,7 @@ def build_orders() -> list[Order]:
     return [
         Order(
             id="mail",
-            name="Mail",
+            name="Почта",
             endpoint=RIDGE,
             weight=3,
             reward=50,
@@ -15,7 +15,7 @@ def build_orders() -> list[Order]:
         ),
         Order(
             id="tools",
-            name="Tools",
+            name="Инструменты",
             endpoint=RIDGE,
             weight=8,
             reward=80,
@@ -23,7 +23,7 @@ def build_orders() -> list[Order]:
         ),
         Order(
             id="samples",
-            name="Samples",
+            name="Образцы",
             endpoint=CRATER,
             weight=6,
             reward=80,
@@ -31,7 +31,7 @@ def build_orders() -> list[Order]:
         ),
         Order(
             id="ore",
-            name="Ore",
+            name="Руда",
             endpoint=RIDGE,
             weight=20,
             reward=200,
