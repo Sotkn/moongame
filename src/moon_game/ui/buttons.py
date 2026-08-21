@@ -20,6 +20,7 @@ from moon_game.ui.commands import (
     ToggleShop,
 )
 
+DESIGN_SIZE = (1280, 720)
 OVERLAY_SIZE = (800, 480)
 OVERLAY_PAD = 24
 TITLE_HEIGHT = 32
@@ -149,7 +150,8 @@ def overlay_reason(
 
 
 def overlay_rect(window_size: tuple[int, int]) -> pygame.Rect:
-    width, height = OVERLAY_SIZE
+    width = _window_px(window_size, OVERLAY_SIZE[0])
+    height = _window_px(window_size, OVERLAY_SIZE[1])
     return pygame.Rect(
         (window_size[0] - width) // 2,
         (window_size[1] - height) // 2,
@@ -159,12 +161,13 @@ def overlay_rect(window_size: tuple[int, int]) -> pygame.Rect:
 
 
 def shop_offer_row_rect(overlay: pygame.Rect, index: int) -> pygame.Rect:
-    return _content_row_rect(overlay, index, ROW_HEIGHT, ROW_GAP)
+    return _content_row_rect(overlay, index, *_row_step(overlay))
 
 
 def shop_buy_rect(overlay: pygame.Rect, index: int) -> pygame.Rect:
     row = shop_offer_row_rect(overlay, index)
-    width, height = BUTTON_SIZE
+    width = _overlay_px(overlay, BUTTON_SIZE[0])
+    height = _overlay_px(overlay, BUTTON_SIZE[1])
     return pygame.Rect(
         row.right - width,
         row.y,
@@ -174,7 +177,9 @@ def shop_buy_rect(overlay: pygame.Rect, index: int) -> pygame.Rect:
 
 
 def shop_park_heading_y(overlay: pygame.Rect, offer_count: int) -> int:
-    return _rows_bottom(overlay, offer_count, ROW_HEIGHT, ROW_GAP) + SHOP_SECTION_GAP
+    return _rows_bottom(overlay, offer_count, *_row_step(overlay)) + _overlay_px(
+        overlay, SHOP_SECTION_GAP
+    )
 
 
 def shop_park_row_rect(
@@ -182,13 +187,17 @@ def shop_park_row_rect(
     offer_count: int,
     index: int,
 ) -> pygame.Rect:
-    y = shop_park_heading_y(overlay, offer_count) + SHOP_HEADING_HEIGHT
-    y += index * (SHOP_COMPACT_ROW + SHOP_ROW_GAP)
+    y = shop_park_heading_y(overlay, offer_count) + _overlay_px(
+        overlay, SHOP_HEADING_HEIGHT
+    )
+    row = _overlay_px(overlay, SHOP_COMPACT_ROW)
+    y += index * (row + _overlay_px(overlay, SHOP_ROW_GAP))
+    pad = _overlay_px(overlay, OVERLAY_PAD)
     return pygame.Rect(
-        overlay.x + OVERLAY_PAD,
+        overlay.x + pad,
         y,
-        overlay.width - 2 * OVERLAY_PAD,
-        SHOP_COMPACT_ROW,
+        overlay.width - 2 * pad,
+        row,
     )
 
 
@@ -199,7 +208,7 @@ def shop_jobs_heading_y(
 ) -> int:
     last_park = max(0, rover_count - 1)
     park_bottom = shop_park_row_rect(overlay, offer_count, last_park).bottom
-    return park_bottom + SHOP_SECTION_GAP
+    return park_bottom + _overlay_px(overlay, SHOP_SECTION_GAP)
 
 
 def shop_job_row_rect(
@@ -208,13 +217,17 @@ def shop_job_row_rect(
     rover_count: int,
     index: int,
 ) -> pygame.Rect:
-    y = shop_jobs_heading_y(overlay, offer_count, rover_count) + SHOP_HEADING_HEIGHT
-    y += index * (SHOP_COMPACT_ROW + SHOP_ROW_GAP)
+    y = shop_jobs_heading_y(overlay, offer_count, rover_count) + _overlay_px(
+        overlay, SHOP_HEADING_HEIGHT
+    )
+    row = _overlay_px(overlay, SHOP_COMPACT_ROW)
+    y += index * (row + _overlay_px(overlay, SHOP_ROW_GAP))
+    pad = _overlay_px(overlay, OVERLAY_PAD)
     return pygame.Rect(
-        overlay.x + OVERLAY_PAD,
+        overlay.x + pad,
         y,
-        overlay.width - 2 * OVERLAY_PAD,
-        SHOP_COMPACT_ROW,
+        overlay.width - 2 * pad,
+        row,
     )
 
 
@@ -224,13 +237,16 @@ def rover_card_rect(
     index: int,
     rover_count: int,
 ) -> pygame.Rect:
-    y = _rows_bottom(overlay, order_count, ROW_HEIGHT, ROW_GAP) + ROVER_CARD_GAP
-    inner_width = overlay.width - 2 * OVERLAY_PAD
+    y = _rows_bottom(overlay, order_count, *_row_step(overlay)) + _overlay_px(
+        overlay, ROVER_CARD_GAP
+    )
+    pad = _overlay_px(overlay, OVERLAY_PAD)
+    inner_width = overlay.width - 2 * pad
     count = max(1, rover_count)
-    gap = ROVER_CARD_INNER_GAP if count > 1 else 0
+    gap = _overlay_px(overlay, ROVER_CARD_INNER_GAP) if count > 1 else 0
     width = (inner_width - gap * (count - 1)) // count
-    x = overlay.x + OVERLAY_PAD + index * (width + gap)
-    return pygame.Rect(x, y, width, ROVER_CARD_HEIGHT)
+    x = overlay.x + pad + index * (width + gap)
+    return pygame.Rect(x, y, width, _overlay_px(overlay, ROVER_CARD_HEIGHT))
 
 
 def route_button_rect(
@@ -240,22 +256,27 @@ def route_button_rect(
     index: int,
     route_count: int,
 ) -> pygame.Rect:
-    y = rover_card_rect(overlay, order_count, 0, rover_count).bottom + ROUTE_ROW_GAP
-    inner_width = overlay.width - 2 * OVERLAY_PAD
+    y = rover_card_rect(overlay, order_count, 0, rover_count).bottom + _overlay_px(
+        overlay, ROUTE_ROW_GAP
+    )
+    pad = _overlay_px(overlay, OVERLAY_PAD)
+    inner_width = overlay.width - 2 * pad
     count = max(1, route_count)
-    gap = ROVER_CARD_INNER_GAP if count > 1 else 0
+    gap = _overlay_px(overlay, ROVER_CARD_INNER_GAP) if count > 1 else 0
     width = (inner_width - gap * (count - 1)) // count
-    x = overlay.x + OVERLAY_PAD + index * (width + gap)
-    return pygame.Rect(x, y, width, ROUTE_ROW_HEIGHT)
+    x = overlay.x + pad + index * (width + gap)
+    return pygame.Rect(x, y, width, _overlay_px(overlay, ROUTE_ROW_HEIGHT))
 
 
 def _hud_buttons(
     state: GameState,
     window_size: tuple[int, int],
 ) -> list[Button]:
-    width, height = HUD_BUTTON_SIZE
-    x = window_size[0] - HUD_MARGIN
-    y = HUD_BUTTON_Y
+    width = _window_px(window_size, HUD_BUTTON_SIZE[0])
+    height = _window_px(window_size, HUD_BUTTON_SIZE[1])
+    x = window_size[0] - _window_px(window_size, HUD_MARGIN)
+    y = _window_px(window_size, HUD_BUTTON_Y)
+    gap = _window_px(window_size, BUTTON_GAP)
     buttons: list[Button] = []
 
     def add(button_id: str, label: str, command: ButtonCommand) -> None:
@@ -269,7 +290,7 @@ def _hud_buttons(
                 command=command,
             )
         )
-        x -= BUTTON_GAP
+        x -= gap
 
     add("end-day", "End day", EndDay())
     if state.phase is GamePhase.RUNNING:
@@ -312,7 +333,7 @@ def _order_rows(state: GameState, overlay: pygame.Rect) -> list[Button]:
         buttons.append(
             Button(
                 id=f"order-{order.id}",
-                rect=_content_row_rect(overlay, index, ROW_HEIGHT, ROW_GAP),
+                rect=_content_row_rect(overlay, index, *_row_step(overlay)),
                 label=_order_label(order, state.day_elapsed),
                 command=SelectOrder(order.id),
             )
@@ -444,12 +465,14 @@ def _buy_enabled(state: GameState, offer: ShopOffer) -> bool:
 
 
 def _overlay_action_rect(overlay: pygame.Rect, index_from_right: int) -> pygame.Rect:
-    width, height = BUTTON_SIZE
-    x = overlay.right - OVERLAY_PAD - (index_from_right + 1) * width
-    x -= index_from_right * BUTTON_GAP
+    width = _overlay_px(overlay, BUTTON_SIZE[0])
+    height = _overlay_px(overlay, BUTTON_SIZE[1])
+    pad = _overlay_px(overlay, OVERLAY_PAD)
+    x = overlay.right - pad - (index_from_right + 1) * width
+    x -= index_from_right * _overlay_px(overlay, BUTTON_GAP)
     return pygame.Rect(
         x,
-        overlay.bottom - OVERLAY_PAD - height,
+        overlay.bottom - pad - height,
         width,
         height,
     )
@@ -461,11 +484,12 @@ def _content_row_rect(
     height: int,
     gap: int,
 ) -> pygame.Rect:
-    y = overlay.y + OVERLAY_PAD + TITLE_HEIGHT + index * (height + gap)
+    pad = _overlay_px(overlay, OVERLAY_PAD)
+    y = overlay.y + pad + _overlay_px(overlay, TITLE_HEIGHT) + index * (height + gap)
     return pygame.Rect(
-        overlay.x + OVERLAY_PAD,
+        overlay.x + pad,
         y,
-        overlay.width - 2 * OVERLAY_PAD,
+        overlay.width - 2 * pad,
         height,
     )
 
@@ -477,8 +501,24 @@ def _rows_bottom(
     gap: int,
 ) -> int:
     if count <= 0:
-        return overlay.y + OVERLAY_PAD + TITLE_HEIGHT
+        return (
+            overlay.y
+            + _overlay_px(overlay, OVERLAY_PAD)
+            + _overlay_px(overlay, TITLE_HEIGHT)
+        )
     return _content_row_rect(overlay, count - 1, height, gap).bottom
+
+
+def _row_step(overlay: pygame.Rect) -> tuple[int, int]:
+    return _overlay_px(overlay, ROW_HEIGHT), _overlay_px(overlay, ROW_GAP)
+
+
+def _overlay_px(overlay: pygame.Rect, value: int) -> int:
+    return max(1, round(value * overlay.width / OVERLAY_SIZE[0]))
+
+
+def _window_px(window_size: tuple[int, int], value: int) -> int:
+    return max(1, round(value * window_size[0] / DESIGN_SIZE[0]))
 
 
 def _order_label(order: Order, day_elapsed: float) -> str:
