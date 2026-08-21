@@ -20,7 +20,7 @@ from moon_game.ui.commands import (
     ToggleShop,
 )
 
-OVERLAY_SIZE = (800, 480)
+OVERLAY_SIZE = (960, 560)
 OVERLAY_PAD = 24
 TITLE_HEIGHT = 32
 ROW_HEIGHT = 40
@@ -45,7 +45,18 @@ ASSIGN_LEFT_NUM = 2
 ASSIGN_LEFT_DEN = 5
 ASSIGN_REASON_HEIGHT = 28
 ASSIGN_ROUTE_INDENT = 16
+ASSIGN_TABLE_HEADER = 24
+ASSIGN_ROW_PAD = 12
+ASSIGN_COL_GAP = 8
 ROUTE_ROW_HEIGHT = 36
+ORDER_COLUMNS: tuple[tuple[str, int], ...] = (
+    ("Название", 22),
+    ("Куда", 16),
+    ("Вес", 10),
+    ("Награда", 14),
+    ("Срок", 14),
+    ("Статус", 24),
+)
 
 type ButtonCommand = (
     SelectOrder
@@ -310,8 +321,55 @@ def assignment_park_viewport(overlay: pygame.Rect) -> pygame.Rect:
     return _column_viewport(overlay, assignment_left_rect(overlay))
 
 
+def assignment_order_header_rect(overlay: pygame.Rect) -> pygame.Rect:
+    column = assignment_right_rect(overlay)
+    y = column.y + _overlay_px(overlay, SHOP_HEADING_HEIGHT)
+    return pygame.Rect(
+        column.x,
+        y,
+        column.width,
+        _overlay_px(overlay, ASSIGN_TABLE_HEADER),
+    )
+
+
 def assignment_jobs_viewport(overlay: pygame.Rect) -> pygame.Rect:
-    return _column_viewport(overlay, assignment_right_rect(overlay))
+    column = assignment_right_rect(overlay)
+    top = (
+        column.y
+        + _overlay_px(overlay, SHOP_HEADING_HEIGHT)
+        + _overlay_px(overlay, ASSIGN_TABLE_HEADER)
+    )
+    return pygame.Rect(column.x, top, column.width, column.bottom - top)
+
+
+def order_column_rects(row: pygame.Rect, overlay: pygame.Rect) -> list[pygame.Rect]:
+    pad = _overlay_px(overlay, ASSIGN_ROW_PAD)
+    gap = _overlay_px(overlay, ASSIGN_COL_GAP)
+    inner = pygame.Rect(row.x + pad, row.y, row.width - 2 * pad, row.height)
+    total_weight = sum(weight for _, weight in ORDER_COLUMNS)
+    usable = inner.width - gap * (len(ORDER_COLUMNS) - 1)
+    x = inner.x
+    rects: list[pygame.Rect] = []
+    for index, (_, weight) in enumerate(ORDER_COLUMNS):
+        if index == len(ORDER_COLUMNS) - 1:
+            width = inner.right - x
+        else:
+            width = usable * weight // total_weight
+        rects.append(pygame.Rect(x, inner.y, width, inner.height))
+        x += width + gap
+    return rects
+
+
+def order_cell_texts(order: Order, day_elapsed: float) -> tuple[str, ...]:
+    remaining = max(0.0, order.deadline - day_elapsed)
+    return (
+        order.name,
+        order.endpoint.name,
+        str(order.weight),
+        f"${order.reward}",
+        f"{remaining:.0f}ч",
+        _order_status_label(order),
+    )
 
 
 def assignment_reason_y(overlay: pygame.Rect) -> int:
@@ -480,7 +538,7 @@ def _order_rows(
                 rect=assignment_order_row_rect(
                     overlay, state, selected_order, index, scroll
                 ),
-                label=_order_label(order, state.day_elapsed),
+                label="",
                 command=SelectOrder(order.id),
             )
         )
@@ -676,15 +734,6 @@ def _overlay_px(overlay: pygame.Rect, value: int) -> int:
 
 def _window_px(window_size: tuple[int, int], value: int) -> int:
     return max(1, round(value * window_size[0] / 1280))
-
-
-def _order_label(order: Order, day_elapsed: float) -> str:
-    remaining = max(0.0, order.deadline - day_elapsed)
-    return (
-        f"{order.name}  {order.endpoint.name}  "
-        f"вес {order.weight}  ${order.reward}  "
-        f"срок {remaining:.0f}ч  {_order_status_label(order)}"
-    )
 
 
 def _order_status_label(order: Order) -> str:

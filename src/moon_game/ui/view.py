@@ -30,8 +30,10 @@ from moon_game.game_state import GamePhase, GameState
 from moon_game.geometry import Vec2
 from moon_game.purchase import can_buy
 from moon_game.ui.buttons import (
+    ORDER_COLUMNS,
     Button,
     assignment_left_rect,
+    assignment_order_header_rect,
     assignment_park_viewport,
     assignment_reason_y,
     assignment_right_rect,
@@ -40,6 +42,8 @@ from moon_game.ui.buttons import (
     build_buttons,
     button_enabled,
     button_selected,
+    order_cell_texts,
+    order_column_rects,
     overlay_button_clip,
     overlay_reason,
     overlay_rect,
@@ -480,6 +484,7 @@ class Ui:
         jobs_heading = self._font.render("Заказы", True, BUTTON_TEXT)
         self._screen.blit(park_heading, (left.x, left.y))
         self._screen.blit(jobs_heading, (right.x, right.y))
+        self._draw_order_table_header(panel)
         previous = self._screen.get_clip()
         self._screen.set_clip(park)
         for index, rover in enumerate(state.rovers):
@@ -499,6 +504,31 @@ class Ui:
         if reason:
             text = self._font.render(reason, True, REASON_COLOR)
             self._screen.blit(text, (left.x, assignment_reason_y(panel)))
+
+    def _draw_order_table_header(self, panel: pygame.Rect) -> None:
+        header = assignment_order_header_rect(panel)
+        for rect, (title, _) in zip(
+            order_column_rects(header, panel), ORDER_COLUMNS, strict=True
+        ):
+            label = self._font.render(title, True, LABEL_COLOR)
+            dest = label.get_rect(midleft=(rect.x, header.centery))
+            self._screen.blit(label, dest)
+
+    def _draw_order_row_cells(
+        self,
+        row: pygame.Rect,
+        order: Order,
+        day_elapsed: float,
+        panel: pygame.Rect,
+    ) -> None:
+        for rect, text in zip(
+            order_column_rects(row, panel),
+            order_cell_texts(order, day_elapsed),
+            strict=True,
+        ):
+            label = self._font.render(text, True, BUTTON_TEXT)
+            dest = label.get_rect(midleft=(rect.x, row.centery))
+            self._screen.blit(label, dest)
 
     def _draw_shop(self, state: GameState) -> None:
         panel = self._draw_panel_frame()
@@ -723,14 +753,24 @@ class Ui:
             pygame.draw.rect(
                 self._screen, color, button.rect, border_radius=self._px(6)
             )
-            label = self._font.render(button.label, True, BUTTON_TEXT)
-            if isinstance(button.command, (SelectOrder, SelectRoute)):
-                dest = label.get_rect(
-                    midleft=(button.rect.x + self._px(12), button.rect.centery)
-                )
+            if isinstance(button.command, SelectOrder):
+                order = state.order_by_id(button.command.order_id)
+                if order is not None:
+                    self._draw_order_row_cells(
+                        button.rect,
+                        order,
+                        state.day_elapsed,
+                        overlay,
+                    )
             else:
-                dest = label.get_rect(center=button.rect.center)
-            self._screen.blit(label, dest)
+                label = self._font.render(button.label, True, BUTTON_TEXT)
+                if isinstance(button.command, SelectRoute):
+                    dest = label.get_rect(
+                        midleft=(button.rect.x + self._px(12), button.rect.centery)
+                    )
+                else:
+                    dest = label.get_rect(center=button.rect.center)
+                self._screen.blit(label, dest)
             if previous is not None:
                 self._screen.set_clip(previous)
 
