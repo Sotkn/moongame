@@ -104,6 +104,7 @@ class Ui:
         self._screen = pygame.display.set_mode(WINDOW_SIZE)
         self._font = pygame.font.SysFont("segoe ui", 18)
         self._title_font = pygame.font.SysFont("segoe ui", 22)
+        self._map_font = pygame.font.SysFont("segoe ui", 22, bold=True)
         self._images: dict[str, pygame.Surface] = {}
         self._selected_order_id: str | None = None
         self._selected_rover_id: str | None = None
@@ -730,7 +731,7 @@ class Ui:
 
     def _draw_hud(self, state: GameState) -> None:
         remaining = max(0.0, state.day_length - state.day_elapsed)
-        clock = f"День  {state.day_number}    Время  {remaining:.0f}с"
+        clock = f"День  {state.day_number}    Время  {remaining:.0f}ч"
         text = f"{clock}    Деньги  {state.money}"
         line = self._font.render(text, True, LABEL_COLOR)
         notice = (
@@ -820,7 +821,7 @@ class Ui:
         origin: tuple[int, int],
         offset: tuple[int, int],
     ) -> None:
-        surface = self._font.render(text, True, LABEL_COLOR)
+        surface = self._map_font.render(text, True, LABEL_COLOR)
         rect = surface.get_rect(
             center=(origin[0] + offset[0], origin[1] + offset[1]),
         )

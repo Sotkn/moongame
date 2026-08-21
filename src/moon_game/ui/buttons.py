@@ -683,7 +683,7 @@ def _order_label(order: Order, day_elapsed: float) -> str:
     return (
         f"{order.name}  {order.endpoint.name}  "
         f"вес {order.weight}  ${order.reward}  "
-        f"срок {remaining:.0f}с  {_order_status_label(order)}"
+        f"срок {remaining:.0f}ч  {_order_status_label(order)}"
     )
 
 
