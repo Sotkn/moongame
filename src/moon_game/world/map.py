@@ -1,7 +1,7 @@
 from moon_game.entities import Map
 from moon_game.geometry import Vec2
 
-BASE = Vec2(120, 400)
+BASE = Vec2(700, 400)
 
 
 def build_map() -> Map:
