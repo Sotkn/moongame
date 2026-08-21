@@ -22,7 +22,7 @@ def build_routes(play_map: Map) -> list[Route]:
                 Vec2(180, 500),
                 Vec2(400, 520),
                 Vec2(650, 480),
-                Vec2(800, 300),
+                Vec2(800, 400),
             ),
             id="ridge-long",
             name="Long",
