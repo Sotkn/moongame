@@ -57,7 +57,7 @@ from moon_game.ui.commands import (
 )
 from moon_game.window_events import WindowEvent, WindowEventKind
 
-WINDOW_SIZE = (960, 540)
+WINDOW_SIZE = (1280, 720)
 ROUTE_COLOR = (92, 98, 112)
 ROUTE_HIGHLIGHT = (168, 196, 224)
 ROUTE_HIGH_RISK = (196, 108, 72)
@@ -80,7 +80,7 @@ SPRITE_MAX_SIZE = {
     "rover": 48,
     "base": 100,
     "poi1": 70,
-    "poi2": 70,
+    "poi2": 200,
     "poi3": 70,
 }
 

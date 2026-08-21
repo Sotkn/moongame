@@ -19,10 +19,10 @@ from moon_game.entities import (
     RoverStatus,
     ShopOffer,
 )
-from moon_game.geometry import Vec2
 from moon_game.purchase import can_buy
 from moon_game.world.day import DAY_LENGTH
 from moon_game.world.endpoints import ENDPOINTS
+from moon_game.world.map import build_map
 from moon_game.world.orders import build_orders
 from moon_game.world.routes import build_routes
 from moon_game.world.rovers import build_rovers
@@ -141,7 +141,7 @@ def load_state() -> GameState:
 
 
 def initial_state() -> GameState:
-    play_map = Map(id="crater-plain", base=Vec2(120, 400), image_key="map")
+    play_map = build_map()
     return GameState(
         map=play_map,
         endpoints=list(ENDPOINTS),
