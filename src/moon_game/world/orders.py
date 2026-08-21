@@ -1,40 +1,19 @@
 from moon_game.entities import Order
-from moon_game.world.day import DAY_LENGTH
-from moon_game.world.endpoints import CRATER, RIDGE
+from moon_game.storage import load_order_rows
+from moon_game.world.endpoints import ENDPOINTS
+
+_ENDPOINTS = {endpoint.id: endpoint for endpoint in ENDPOINTS}
 
 
 def build_orders() -> list[Order]:
     return [
         Order(
-            id="mail",
-            name="Почта",
-            endpoint=RIDGE,
-            weight=3,
-            reward=50,
-            deadline=13.0,
-        ),
-        Order(
-            id="tools",
-            name="Инструменты",
-            endpoint=RIDGE,
-            weight=8,
-            reward=80,
-            deadline=DAY_LENGTH,
-        ),
-        Order(
-            id="samples",
-            name="Образцы",
-            endpoint=CRATER,
-            weight=6,
-            reward=80,
-            deadline=DAY_LENGTH,
-        ),
-        Order(
-            id="ore",
-            name="Руда",
-            endpoint=RIDGE,
-            weight=20,
-            reward=200,
-            deadline=DAY_LENGTH,
-        ),
+            id=row.id,
+            name=row.name,
+            endpoint=_ENDPOINTS[row.endpoint_id],
+            weight=row.weight,
+            reward=row.reward,
+            deadline=row.deadline,
+        )
+        for row in load_order_rows()
     ]
