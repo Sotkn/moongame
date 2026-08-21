@@ -121,6 +121,7 @@ class Simulation:
         delivery.rover.position = delivery.route.start
         delivery.rover.battery = max(0.0, delivery.rover.battery)
         state.money += delivery.order.reward
+        state.completed_count += 1
 
     def _spend_battery(self, delivery: Delivery, leg_progress: float) -> None:
         cost = energy_cost(delivery.route, delivery.order)

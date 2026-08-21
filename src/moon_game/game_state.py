@@ -20,7 +20,7 @@ from moon_game.entities import (
     ShopOffer,
 )
 from moon_game.purchase import can_buy
-from moon_game.world.day import DAY_LENGTH
+from moon_game.world.day import DAY_LENGTH, TOTAL_DAYS
 from moon_game.world.endpoints import ENDPOINTS
 from moon_game.world.map import build_map
 from moon_game.world.orders import build_orders
@@ -45,6 +45,7 @@ class GameState:
     shop_offers: list[ShopOffer] = field(default_factory=list)
     deliveries: list[Delivery] = field(default_factory=list)
     money: int = 0
+    completed_count: int = 0
     phase: GamePhase = GamePhase.DAY_START
     pending_event: ChooseDelivery | None = None
     hazard_notice: str | None = None
@@ -52,6 +53,10 @@ class GameState:
     day_number: int = 1
     day_elapsed: float = 0.0
     day_length: float = DAY_LENGTH
+    total_days: int = TOTAL_DAYS
+
+    def is_final_day(self) -> bool:
+        return self.day_number >= self.total_days
 
     def rover_by_id(self, rover_id: str) -> Rover | None:
         for rover in self.rovers:

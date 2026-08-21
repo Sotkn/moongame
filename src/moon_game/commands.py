@@ -55,6 +55,8 @@ class NextDay:
     def apply(self, state: GameState) -> None:
         if state.phase is not GamePhase.DAY_END:
             return
+        if state.is_final_day():
+            return
         prepare_next_day(state)
 
 

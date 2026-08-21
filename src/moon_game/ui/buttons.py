@@ -92,6 +92,8 @@ def build_buttons(
     assign_right_scroll: int = 0,
 ) -> list[Button]:
     if state.phase is GamePhase.DAY_END:
+        if state.is_final_day():
+            return []
         return [_next_day_button(window_size)]
     buttons = _hud_buttons(state, window_size)
     if open_panel is OpenPanel.ASSIGNMENT:
@@ -122,7 +124,7 @@ def button_enabled(
     if isinstance(command, StartDay):
         return state.phase is GamePhase.DAY_START
     if isinstance(command, NextDay):
-        return state.phase is GamePhase.DAY_END
+        return state.phase is GamePhase.DAY_END and not state.is_final_day()
     if isinstance(command, BuyRover):
         return _buy_enabled(state, command.offer)
     if isinstance(command, EndDay):

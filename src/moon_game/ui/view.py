@@ -626,6 +626,9 @@ class Ui:
             )
 
     def _draw_day_end(self, state: GameState) -> None:
+        if state.is_final_day():
+            self._draw_game_over(state)
+            return
         panel = self._draw_panel_frame()
         title = self._title_font.render("Конец дня", True, BUTTON_TEXT)
         self._screen.blit(title, (panel.x + self._px(24), panel.y + self._px(20)))
@@ -657,6 +660,28 @@ class Ui:
                 if order.status not in (OrderStatus.COMPLETED, OrderStatus.FAILED)
             ],
         )
+
+    def _draw_game_over(self, state: GameState) -> None:
+        panel = self._draw_panel_frame()
+        title = self._title_font.render("Игра окончена", True, BUTTON_TEXT)
+        self._screen.blit(title, (panel.x + self._px(24), panel.y + self._px(20)))
+        y = panel.y + self._px(72)
+        score = self._title_font.render(
+            f"Успешных заказов  {state.completed_count}",
+            True,
+            BUTTON_TEXT,
+        )
+        self._screen.blit(score, (panel.x + self._px(24), y))
+        y += self._px(40)
+        goal = self._font.render(
+            f"Цель: выполнить как можно больше за {state.total_days} дня",
+            True,
+            LABEL_COLOR,
+        )
+        self._screen.blit(goal, (panel.x + self._px(24), y))
+        y += self._px(28)
+        money = self._font.render(f"Деньги  {state.money}", True, LABEL_COLOR)
+        self._screen.blit(money, (panel.x + self._px(24), y))
 
     def _draw_order_group(
         self,
@@ -776,7 +801,9 @@ class Ui:
 
     def _draw_hud(self, state: GameState) -> None:
         remaining = max(0.0, state.day_length - state.day_elapsed)
-        clock = f"День  {state.day_number}    Время  {remaining:.0f}ч"
+        clock = (
+            f"День  {state.day_number}/{state.total_days}    Время  {remaining:.0f}ч"
+        )
         text = f"{clock}    Деньги  {state.money}"
         line = self._font.render(text, True, LABEL_COLOR)
         notice = (
