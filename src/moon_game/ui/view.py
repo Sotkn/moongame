@@ -284,7 +284,10 @@ class Ui:
         if isinstance(command, BuyRover):
             self._selected_rover_id = command.offer.id
             return [command]
-        if isinstance(command, (Pause, StartDay, NextDay, EndDay)):
+        if isinstance(command, StartDay):
+            self._open_panel = OpenPanel.NONE
+            return [command]
+        if isinstance(command, (Pause, NextDay, EndDay)):
             return [command]
         return []
 

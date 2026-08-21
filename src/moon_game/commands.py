@@ -36,8 +36,11 @@ class StartDay:
 @dataclass(frozen=True)
 class DismissChoice:
     def apply(self, state: GameState) -> None:
-        if isinstance(state.pending_event, ChooseDelivery):
-            state.pending_event = None
+        if not isinstance(state.pending_event, ChooseDelivery):
+            return
+        state.pending_event = None
+        if state.phase is GamePhase.RUNNING:
+            state.paused = False
 
 
 @dataclass(frozen=True)
