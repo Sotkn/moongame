@@ -31,7 +31,6 @@ from moon_game.geometry import Vec2
 from moon_game.hazard import HIGH_RISK
 from moon_game.purchase import can_buy
 from moon_game.ui.buttons import (
-    DESIGN_SIZE,
     Button,
     assignment_title,
     build_buttons,
@@ -59,6 +58,7 @@ from moon_game.ui.commands import (
 )
 from moon_game.window_events import WindowEvent, WindowEventKind
 
+WINDOW_SIZE = (1280, 720)
 ROUTE_COLOR = (92, 98, 112)
 ROUTE_HIGHLIGHT = (168, 196, 224)
 ROUTE_HIGH_RISK = (196, 108, 72)
@@ -90,15 +90,11 @@ class Ui:
     def __init__(self) -> None:
         pygame.init()
         pygame.display.set_caption("Moon Courier Crisis")
-        pygame.display.set_mode(DESIGN_SIZE, pygame.SCALED)
-        window_size = pygame.display.get_window_size()
-        self._scale = window_size[0] / DESIGN_SIZE[0]
-        self._window_size = window_size
-        self._screen = pygame.display.set_mode(window_size)
-        self._font = pygame.font.SysFont("segoe ui", max(1, round(18 * self._scale)))
-        self._title_font = pygame.font.SysFont(
-            "segoe ui", max(1, round(22 * self._scale))
-        )
+        self._scale = 1.0
+        self._window_size = WINDOW_SIZE
+        self._screen = pygame.display.set_mode(WINDOW_SIZE)
+        self._font = pygame.font.SysFont("segoe ui", 18)
+        self._title_font = pygame.font.SysFont("segoe ui", 22)
         self._images: dict[str, pygame.Surface] = {}
         self._selected_order_id: str | None = None
         self._selected_rover_id: str | None = None
@@ -106,7 +102,7 @@ class Ui:
         self._open_panel = OpenPanel.ASSIGNMENT
         self._last_phase: GamePhase | None = None
         self._last_pending: ChooseDelivery | None = None
-        self._dim = pygame.Surface(window_size, pygame.SRCALPHA)
+        self._dim = pygame.Surface(WINDOW_SIZE, pygame.SRCALPHA)
         self._dim.fill(OVERLAY_DIM)
 
     def read_commands(

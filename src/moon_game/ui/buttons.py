@@ -20,7 +20,6 @@ from moon_game.ui.commands import (
     ToggleShop,
 )
 
-DESIGN_SIZE = (1280, 720)
 OVERLAY_SIZE = (800, 480)
 OVERLAY_PAD = 24
 TITLE_HEIGHT = 32
@@ -518,7 +517,7 @@ def _overlay_px(overlay: pygame.Rect, value: int) -> int:
 
 
 def _window_px(window_size: tuple[int, int], value: int) -> int:
-    return max(1, round(value * window_size[0] / DESIGN_SIZE[0]))
+    return max(1, round(value * window_size[0] / 1280))
 
 
 def _order_label(order: Order, day_elapsed: float) -> str:
